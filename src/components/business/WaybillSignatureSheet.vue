@@ -197,7 +197,9 @@ function showError(error: unknown, fallback: string) {
             <TmsIcon name="info" size="32rpx" />
             <text>签收后运单进入“已签收”，还需录入收车时间和里程才算完成。</text>
           </view>
-          <TmsRecordTimeNotice class="signature-sheet__time-notice" subject="签收时间" />
+          <view class="signature-sheet__time-notice">
+            <TmsRecordTimeNotice subject="签收时间" />
+          </view>
 
           <view class="sheet-field">
             <view class="sheet-field__number">1</view>
@@ -300,10 +302,10 @@ function showError(error: unknown, fallback: string) {
           {{ submitMissing.length ? `还需：${submitMissing.join('、')}` : '签收资料已完整' }}
         </view>
         <wd-button
-          class="signature-sheet__cancel"
           custom-class="tms-secondary-action"
           variant="plain"
           type="primary"
+          block
           :round="false"
           :disabled="state.submitting"
           @click="visible = false"
@@ -313,6 +315,7 @@ function showError(error: unknown, fallback: string) {
         <wd-button
           custom-class="tms-primary-action"
           type="primary"
+          block
           :round="false"
           :loading="state.submitting"
           loading-color="#ffffff"

@@ -182,14 +182,16 @@ function open() {
           @tap.stop
         >
           <wd-button
-            class="route-card__nav-button"
             variant="text"
+            custom-style="width: 88rpx; min-width: 44px; height: 88rpx; min-height: 44px; padding: 0; color: #748096; background: transparent; border: 0; box-shadow: none;"
             @click="emit('navigate', props.waybill)"
           >
-            <view class="route-card__nav-icon">
-              <TmsIcon name="nav" size="22rpx" />
+            <view class="route-card__nav-content">
+              <view class="route-card__nav-icon">
+                <TmsIcon name="nav" size="22rpx" />
+              </view>
+              <text class="route-card__nav-label">导航</text>
             </view>
-            <text class="route-card__nav-label">导航</text>
           </wd-button>
         </view>
       </view>
@@ -441,31 +443,16 @@ function open() {
   top: 20rpx;
 }
 
-.route-card__nav-button {
+.route-card__nav-content {
   width: 88rpx;
   min-width: 44px;
   height: 88rpx;
   min-height: 44px;
-  padding: 0;
-  color: #748096;
-  background: transparent;
-  border: 0;
-  box-shadow: none;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1rpx;
-  font-size: max(20rpx, 12px);
-  line-height: 1;
-}
-
-.route-card__nav-button :deep(.wd-button__content) {
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
   gap: 4rpx;
-  line-height: 1;
 }
 
 .route-card__nav-icon {
@@ -487,15 +474,6 @@ function open() {
   font-size: max(20rpx, 12px);
   font-weight: 600;
   line-height: 1;
-  white-space: nowrap;
-}
-
-.route-card__nav-button :deep(.wd-button__text) {
-  font-size: max(20rpx, 12px);
-  line-height: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4rpx;
   white-space: nowrap;
 }
 

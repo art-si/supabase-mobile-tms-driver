@@ -1,6 +1,10 @@
 import type { Session } from './types'
 
-export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+export const SUPABASE_URL =
+  // #ifdef MP-WEIXIN
+  import.meta.env.VITE_SUPABASE_MP_URL ||
+  // #endif
+  import.meta.env.VITE_SUPABASE_URL
 export const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY
 
 type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE'
@@ -19,7 +23,7 @@ interface ApiErrorDetails {
 }
 
 const TECHNICAL_ERROR_PATTERN =
-  /(?:function|operator|column|relation|record|type).*?(?:does not exist|has no field)|schema cache|postgrest|pgrst\d+|sqlstate|duplicate key value|violates .* constraint|invalid input syntax|failed to run sql query|unexpected token/i
+  /(?:function|operator|column|relation|record|type).*?(?:does not exist|has no field)|schema cache|postgrest|pgrst\d+|sqlstate|duplicate key value|violates .* constraint|invalid input syntax|failed to run sql query|unexpected token|WECHAT_MP_(?:APPID|SECRET)/i
 const NETWORK_ERROR_PATTERN = /request:fail|failed to fetch|network error|network request failed/i
 
 export class ApiRequestError extends Error {
@@ -66,6 +70,9 @@ function normalizeKnownError(message: string, fallback: string) {
   }
   if (/too many requests|rate limit/i.test(message)) return '操作过于频繁，请稍后重试'
   if (/timeout|timed out/i.test(message)) return '请求超时，请稍后重试'
+  if (/not in domain list|域名不在合法域名列表/i.test(message)) {
+    return '小程序请求域名未配置，请联系管理员'
+  }
   if (NETWORK_ERROR_PATTERN.test(message)) return '网络连接异常，请检查网络后重试'
   if (!/[\u3400-\u9fff]/u.test(message)) return fallback
   return message
@@ -159,6 +166,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
         reject(requestError)
       },
       fail(error) {
+        console.warn('[api] network failed', { path: path.split('?')[0], message: error.errMsg })
         reject(new ApiRequestError(error.errMsg, '网络请求失败'))
       }
     })

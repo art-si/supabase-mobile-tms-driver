@@ -50,6 +50,10 @@ const routeError = ref('')
 const routeRetryable = ref(true)
 const routeNotice = ref('')
 const nativeRoadPath = ref<RoutePoint[]>([])
+let nativeMapUnavailable = false
+// #ifndef H5
+nativeMapUnavailable = !Boolean(import.meta.env.VITE_AMAP_WEB_SERVICE_KEY)
+// #endif
 let amap: any
 let driving: any
 let amapLoadPromise: Promise<typeof window.AMap> | null = null
@@ -621,6 +625,7 @@ async function renderNativeDrivingRoute() {
   routeNotice.value = ''
   nativeRoadPath.value = []
   if (points.value.length < 2) return
+  if (nativeMapUnavailable) return
   try {
     const routePoints =
       props.routeMode === 'nodes'
@@ -735,6 +740,7 @@ onBeforeUnmount(() => {
 
     <!-- #ifndef H5 -->
     <map
+      v-if="!nativeMapUnavailable"
       class="route-map__canvas"
       :latitude="center.latitude"
       :longitude="center.longitude"
@@ -746,10 +752,17 @@ onBeforeUnmount(() => {
       enable-rotate
       show-location
     />
+    <view v-else-if="points.length >= 2" class="route-map__empty" role="status">
+      <view class="route-map__empty-icon">
+        <TmsIcon name="location" size="34rpx" />
+      </view>
+      <text class="route-map__empty-title">路线地图暂不可用</text>
+      <text class="route-map__empty-hint">地图服务尚未配置，可在下方查看业务定位节点</text>
+    </view>
     <!-- #endif -->
 
     <view
-      v-if="points.length >= 2 && (!routeReady || routeNotice)"
+      v-if="points.length >= 2 && !nativeMapUnavailable && (!routeReady || routeNotice)"
       class="route-map__planning"
       :class="{ 'route-map__planning--error': routeError }"
       role="status"

@@ -542,20 +542,23 @@ function showError(error: unknown, fallback: string) {
               }}</strong>
             </view>
           </view>
-          <wd-button
-            v-else
-            class="checkin-card__button"
-            custom-class="tms-primary-action"
-            type="primary"
-            :round="false"
-            :loading="state.locating"
-            loading-color="#ffffff"
-            :disabled="state.locating"
-            @click="handleCheckIn"
-          >
-            <TmsIcon v-if="!state.locating" name="location" size="32rpx" />
-            获取定位并打卡
-          </wd-button>
+          <view v-else class="checkin-card__button">
+            <wd-button
+              custom-class="tms-primary-action"
+              type="primary"
+              block
+              :round="false"
+              :loading="state.locating"
+              loading-color="#ffffff"
+              :disabled="state.locating"
+              @click="handleCheckIn"
+            >
+              <view class="tms-inline-action">
+                <TmsIcon v-if="!state.locating" name="location" size="32rpx" />
+                <text>获取定位并打卡</text>
+              </view>
+            </wd-button>
+          </view>
         </view>
 
         <view v-if="!checkinOnly" class="form-card card">
@@ -766,14 +769,16 @@ function showError(error: unknown, fallback: string) {
                 "
                 @click="analyzeWeighbridgeTicket"
               >
-                <wd-loading
-                  v-if="state.analyzing"
-                  type="circular"
-                  color="var(--tms-primary)"
-                  size="24rpx"
-                />
-                <TmsIcon v-else name="camera" size="24rpx" />
-                <text>{{ form.recognitionInfo ? "重新识别" : "识别磅单" }}</text>
+                <view class="tms-inline-action">
+                  <wd-loading
+                    v-if="state.analyzing"
+                    type="circular"
+                    color="var(--tms-primary)"
+                    size="24rpx"
+                  />
+                  <TmsIcon v-else name="camera" size="24rpx" />
+                  <text>{{ form.recognitionInfo ? "重新识别" : "识别磅单" }}</text>
+                </view>
               </button>
             </view>
             <view v-if="form.recognitionInfo" class="recognition-card__result">
@@ -832,18 +837,20 @@ function showError(error: unknown, fallback: string) {
           submitMissing.length ? "请完成必填项" : `确认${title}完成`
         }}</strong>
       </view>
-      <wd-button
-        class="operation-footer__button"
-        custom-class="tms-primary-action"
-        type="primary"
-        :round="false"
-        :loading="state.submitting"
-        loading-color="#ffffff"
-        :disabled="!canSubmit"
-        @click="submit"
-      >
-        提交{{ title }}信息
-      </wd-button>
+      <view class="operation-footer__button">
+        <wd-button
+          custom-class="tms-primary-action"
+          type="primary"
+          block
+          :round="false"
+          :loading="state.submitting"
+          loading-color="#ffffff"
+          :disabled="!canSubmit"
+          @click="submit"
+        >
+          提交{{ title }}信息
+        </wd-button>
+      </view>
     </view>
   </view>
 </wd-config-provider>

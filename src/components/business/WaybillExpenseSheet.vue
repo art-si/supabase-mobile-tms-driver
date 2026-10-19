@@ -571,7 +571,9 @@ function showError(error: unknown, fallback: string) {
           <TmsIcon name="info" size="32rpx" />
           <text>请按实际发生金额填写，并上传清晰、完整的票据或付款凭证。</text>
         </view>
-        <TmsRecordTimeNotice class="expense-sheet__time-notice" subject="费用发生日期" />
+        <view class="expense-sheet__time-notice">
+          <TmsRecordTimeNotice subject="费用发生日期" />
+        </view>
 
         <view class="expense-field">
           <view class="expense-field__number">1</view>
@@ -676,16 +678,18 @@ function showError(error: unknown, fallback: string) {
                 "
                 @click="analyzeAttachments"
               >
-                <wd-loading
-                  v-if="
-                    state.loadingAiConfig || state.analyzing || state.uploading
-                  "
-                  type="circular"
-                  color="var(--tms-primary)"
-                  size="24rpx"
-                />
-                <TmsIcon v-else name="camera" size="24rpx" />
-                <text>{{ ocrActionLabel }}</text>
+                <view class="tms-inline-action">
+                  <wd-loading
+                    v-if="
+                      state.loadingAiConfig || state.analyzing || state.uploading
+                    "
+                    type="circular"
+                    color="var(--tms-primary)"
+                    size="24rpx"
+                  />
+                  <TmsIcon v-else name="camera" size="24rpx" />
+                  <text>{{ ocrActionLabel }}</text>
+                </view>
               </button>
             </view>
             <view v-if="ocrResult" class="expense-ocr__result">
@@ -798,26 +802,30 @@ function showError(error: unknown, fallback: string) {
             </label>
           </view>
           <view class="expense-field__location-row">
-            <wd-input
-              v-model="form.expenseLocation"
-              compact
-              :maxlength="300"
-              aria-label="费用发生地点"
-              placeholder="费用发生地点（可选）"
-            />
+            <view class="expense-field__location-input">
+              <wd-input
+                v-model="form.expenseLocation"
+                compact
+                :maxlength="300"
+                aria-label="费用发生地点"
+                placeholder="费用发生地点（可选）"
+              />
+            </view>
             <button
               aria-label="记录当前位置"
               :disabled="busy"
               @click="locateExpense"
             >
-              <wd-loading
-                v-if="state.locating"
-                type="circular"
-                color="var(--tms-primary)"
-                size="24rpx"
-              />
-              <TmsIcon v-else name="location" size="26rpx" />
-              <text>{{ state.locating ? "定位中" : "当前位置" }}</text>
+              <view class="tms-inline-action">
+                <wd-loading
+                  v-if="state.locating"
+                  type="circular"
+                  color="var(--tms-primary)"
+                  size="24rpx"
+                />
+                <TmsIcon v-else name="location" size="26rpx" />
+                <text>{{ state.locating ? "定位中" : "当前位置" }}</text>
+              </view>
             </button>
           </view>
           <wd-textarea
@@ -1383,9 +1391,12 @@ function showError(error: unknown, fallback: string) {
   align-items: center;
 }
 
-.expense-field__location-row :deep(.wd-input) {
+.expense-field__location-input {
   min-width: 0;
   flex: 1;
+}
+
+.expense-field__location-input :deep(.wd-input) {
   width: 100%;
 }
 .expense-field__location-row :deep(.wd-input__inner) {
@@ -1393,7 +1404,8 @@ function showError(error: unknown, fallback: string) {
 }
 
 .expense-field__location-row button {
-  height: 64rpx;
+  flex: 0 0 auto;
+  min-height: 44px;
   margin: 0 6rpx;
   padding: 0 16rpx;
   border: 0;

@@ -31,11 +31,6 @@ const tabs: Array<{ label: string; value: WaybillStatusGroup }> = [
   { label: '进行中', value: 'active' },
   { label: '已完成', value: 'completed' }
 ]
-const segmentOptions = computed(() => tabs.map((tab) => ({
-  value: tab.value,
-  disabled: isBusy.value && active.value !== tab.value,
-  payload: { label: tab.label }
-})))
 
 onLoad((query) => {
   if (query?.group === 'completed') active.value = 'completed'
@@ -82,10 +77,6 @@ async function switchGroup(value: WaybillStatusGroup) {
   }
 }
 
-function onSegmentChange(option: { value: string | number }) {
-  void switchGroup(option.value as WaybillStatusGroup)
-}
-
 function openDetail(id: string) {
   uni.navigateTo({ url: `/pages/waybill/detail?id=${id}` })
 }
@@ -116,41 +107,33 @@ function navigate(item: Waybill) {
           <text class="waybill-page__title">运输任务</text>
           <text class="waybill-page__subtitle">聚焦当前节点，按顺序完成每项运输任务</text>
         </view>
-        <wd-button
-          class="waybill-page__refresh"
-          aria-label="刷新运单列表"
-          custom-style="width: 88rpx; min-width: 44px; height: 88rpx; min-height: 44px; padding: 0; border-radius: 50%; background: rgba(255,255,255,0.16); color: #fff;"
-          :disabled="isBusy"
-          @click="refreshList"
-        >
-          <wd-loading v-if="refreshing || waybill.loading" type="circular" color="#ffffff" size="34rpx" />
-          <TmsIcon v-else name="refresh" size="38rpx" />
-        </wd-button>
-      </view>
-      <wd-segmented
-        :value="active"
-        :options="segmentOptions"
-        theme="outline"
-        custom-class="waybill-page__tabs"
-        role="tablist"
-        aria-label="运单状态筛选"
-        @change="onSegmentChange"
-      >
-        <template #label="{ option }">
-          <view
-            class="waybill-page__tab"
-            role="tab"
-            :aria-selected="active === option.value"
-            :aria-disabled="isBusy && active !== option.value"
-            tabindex="0"
-            @keydown.enter="switchGroup(option.value)"
-            @keydown.space.prevent="switchGroup(option.value)"
+        <view class="waybill-page__refresh-wrap">
+          <wd-button
+            aria-label="刷新运单列表"
+            custom-style="width: 88rpx; min-width: 44px; height: 88rpx; min-height: 44px; margin: 0; padding: 0; border-radius: 50%; background: rgba(255,255,255,0.16); color: #fff;"
+            :disabled="isBusy"
+            @click="refreshList"
           >
-            <view v-if="loadingGroup === option.value" class="waybill-page__tab-spinner" />
-            {{ option.payload.label }}
-          </view>
-        </template>
-      </wd-segmented>
+            <wd-loading v-if="refreshing || waybill.loading" type="circular" color="#ffffff" size="34rpx" />
+            <TmsIcon v-else name="refresh" size="38rpx" />
+          </wd-button>
+        </view>
+      </view>
+      <view class="waybill-page__tabs" role="tablist" aria-label="运单状态筛选">
+        <button
+          v-for="tab in tabs"
+          :key="tab.value"
+          class="waybill-page__tab"
+          :class="{ 'waybill-page__tab--active': active === tab.value }"
+          role="tab"
+          :aria-selected="active === tab.value"
+          :disabled="isBusy && active !== tab.value"
+          @tap="switchGroup(tab.value)"
+        >
+          <view v-if="loadingGroup === tab.value" class="waybill-page__tab-spinner" />
+          <text>{{ tab.label }}</text>
+        </button>
+      </view>
     </view>
 
     <scroll-view scroll-y class="waybill-page__list">
@@ -200,8 +183,10 @@ function navigate(item: Waybill) {
               hover-class="waybill-expense-action__button--pressed"
               @tap.stop="openExpense(item.id)"
             >
-              <TmsIcon name="expense" size="26rpx" />
-              <text>费用上报</text>
+              <view class="tms-inline-action">
+                <TmsIcon name="expense" size="26rpx" />
+                <text>费用上报</text>
+              </view>
             </button>
           </view>
         </TmsRouteCard>
@@ -217,9 +202,11 @@ function navigate(item: Waybill) {
         <text class="waybill-page__empty-hint">
           {{ waybill.loading ? '请稍候，正在获取最新运单数据' : '可切换任务状态，或确认后台订单已绑定当前司机' }}
         </text>
-        <wd-button v-if="!waybill.loading" class="waybill-page__empty-action" variant="text" @click="refreshList">
-          重新同步
-        </wd-button>
+        <view v-if="!waybill.loading" class="waybill-page__empty-action">
+          <wd-button variant="text" custom-style="min-height: 44px; padding: 0 20rpx; color: var(--tms-primary); font-size: 24rpx; font-weight: 700;" @click="refreshList">
+            重新同步
+          </wd-button>
+        </view>
       </view>
     </scroll-view>
 
@@ -259,6 +246,32 @@ function navigate(item: Waybill) {
   justify-content: space-between;
   gap: 24rpx;
 }
+
+.waybill-page__title-main {
+  padding-right: 110rpx;
+}
+
+.waybill-page__refresh-wrap {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  right: 32rpx;
+  width: 88rpx;
+  height: 88rpx;
+  transform: translateY(-50%);
+}
+
+/* #ifdef MP-WEIXIN */
+.waybill-page__title-row {
+  min-height: 300rpx;
+  padding-top: calc(90rpx + env(safe-area-inset-top));
+}
+
+.waybill-page__refresh-wrap {
+  top: 178rpx;
+  transform: none;
+}
+/* #endif */
 
 .waybill-page__title-row::after {
   position: absolute;
@@ -316,43 +329,17 @@ function navigate(item: Waybill) {
   opacity: 0.82;
 }
 
-.waybill-page__refresh {
-  position: relative;
-  z-index: 1;
-  flex: 0 0 88rpx;
-  width: 88rpx;
-  height: 88rpx;
-  margin: 0 0 0 auto;
-  padding: 0;
-  min-width: 0;
-  border-radius: 50%;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.16);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.waybill-page__refresh.is-disabled {
-  opacity: 0.78;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.16);
-}
-
 .waybill-page__tabs {
   padding: 18rpx 28rpx 20rpx;
   background: rgba(255, 255, 255, 0.96);
-  gap: 12rpx;
-  border-radius: 0;
+  display: flex;
 }
 
-:deep(.waybill-page__tabs)::before {
-  display: none;
-}
-
-:deep(.waybill-page__tabs .wd-segmented__item) {
+.waybill-page__tab {
+  flex: 1;
   min-width: 0;
   height: var(--tms-control-height);
+  min-height: var(--tms-control-height);
   margin: 0;
   padding: 0 10rpx;
   border-radius: 999rpx;
@@ -365,39 +352,30 @@ function navigate(item: Waybill) {
   gap: 8rpx;
   font-size: max(26rpx, 12px);
   font-weight: 700;
+  line-height: 1.2;
 }
 
-:deep(.waybill-page__tabs .wd-segmented__item + .wd-segmented__item) {
-  border-left: 0;
+.waybill-page__tab + .waybill-page__tab {
+  margin-left: 12rpx;
 }
 
-:deep(.waybill-page__tabs .wd-segmented__item-label) {
-  width: 100%;
-}
-
-.waybill-page__tab {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8rpx;
-  width: 100%;
-  min-height: var(--tms-control-height);
+.waybill-page__tab::after {
+  border: 0;
 }
 
 .waybill-page__tab:focus-visible {
   outline: 2px solid currentColor;
   outline-offset: -4px;
-  border-radius: 999rpx;
 }
 
-:deep(.waybill-page__tabs .wd-segmented__item.is-active) {
+.waybill-page__tab--active {
   color: #fff;
   border-color: transparent;
   background: linear-gradient(135deg, var(--tms-primary), var(--tms-primary-bright));
   box-shadow: 0 10rpx 22rpx rgba(var(--tms-primary-rgb), 0.2);
 }
 
-:deep(.waybill-page__tabs .wd-segmented__item.is-disabled) {
+.waybill-page__tab[disabled] {
   opacity: 0.68;
 }
 
@@ -631,9 +609,5 @@ function navigate(item: Waybill) {
 .waybill-page__empty-action {
   min-width: 0;
   margin-top: 8rpx;
-  padding: 0 20rpx;
-  color: var(--tms-primary);
-  font-size: max(24rpx, 12px);
-  font-weight: 700;
 }
 </style>

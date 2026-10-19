@@ -19,6 +19,7 @@ const accountError = ref('')
 const passwordError = ref('')
 const loginError = ref('')
 const focusField = ref<'account' | 'password' | ''>('')
+const inputStyle = 'width: 100%; height: 100%; --wot-input-padding: 0 24rpx; --wot-input-bg: transparent; --wot-input-inner-height: 88rpx; --wot-input-inner-font-size: 28rpx; --wot-input-inner-color: #172033; --wot-input-inner-placeholder-color: #9aa5b7;'
 const accountValue = computed(() => account.value.trim())
 
 watch(account, () => {
@@ -85,7 +86,7 @@ async function phoneLogin(event?: unknown) {
     uni.reLaunch({ url: '/pages/home/index' })
   } catch (error) {
     uni.showToast({
-      title: getUserFacingErrorMessage(error, '手机号登录失败，请稍后重试'),
+      title: getUserFacingErrorMessage(error, '手机号登录暂不可用，请使用账号密码登录'),
       icon: 'none'
     })
   } finally {
@@ -138,58 +139,67 @@ function forgotPassword() {
       </view>
       <view class="login-form__control" :class="{ 'login-form__control--error': accountError }">
         <text class="login-form__label">司机账号</text>
-        <wd-input
-          v-model="account"
-          class="login-form__field"
-          aria-label="司机账号，手机号或邮箱"
-          :aria-invalid="Boolean(accountError)"
-          :error="Boolean(accountError)"
-          :focus="focusField === 'account'"
-          placeholder="请输入手机号/邮箱"
-          type="text"
-          confirm-type="next"
-          clearable
-          no-border
-          :disabled="loading"
-          @blur="focusField = ''"
-        >
-          <template #prefix><TmsIcon name="user" size="34rpx" /></template>
-        </wd-input>
+        <view class="login-form__field" :class="{ 'login-form__field--focused': focusField === 'account' }">
+          <wd-input
+            v-model="account"
+            :custom-style="inputStyle"
+            aria-label="司机账号，手机号或邮箱"
+            :aria-invalid="Boolean(accountError)"
+            :error="Boolean(accountError)"
+            :focus="focusField === 'account'"
+            placeholder="请输入手机号/邮箱"
+            placeholder-style="color: #9aa5b7"
+            type="text"
+            confirm-type="next"
+            clearable
+            no-border
+            :disabled="loading"
+            @focus="focusField = 'account'"
+            @blur="focusField = ''"
+          >
+            <template #prefix><TmsIcon name="user" size="34rpx" /></template>
+          </wd-input>
+        </view>
         <text v-if="accountError" class="login-form__error" role="alert">{{ accountError }}</text>
       </view>
       <view class="login-form__control" :class="{ 'login-form__control--error': passwordError }">
         <text class="login-form__label">登录密码</text>
-        <wd-input
-          v-model="password"
-          class="login-form__field"
-          aria-label="登录密码"
-          :aria-invalid="Boolean(passwordError)"
-          :error="Boolean(passwordError)"
-          :focus="focusField === 'password'"
-          placeholder="请输入登录密码"
-          show-password
-          confirm-type="done"
-          no-border
-          :disabled="loading"
-          @blur="focusField = ''"
-          @confirm="submit"
-        >
-          <template #prefix><TmsIcon name="lock" size="34rpx" /></template>
-        </wd-input>
+        <view class="login-form__field" :class="{ 'login-form__field--focused': focusField === 'password' }">
+          <wd-input
+            v-model="password"
+            :custom-style="inputStyle"
+            aria-label="登录密码"
+            :aria-invalid="Boolean(passwordError)"
+            :error="Boolean(passwordError)"
+            :focus="focusField === 'password'"
+            placeholder="请输入登录密码"
+            placeholder-style="color: #9aa5b7"
+            show-password
+            confirm-type="done"
+            no-border
+            :disabled="loading"
+            @focus="focusField = 'password'"
+            @blur="focusField = ''"
+            @confirm="submit"
+          >
+            <template #prefix><TmsIcon name="lock" size="34rpx" /></template>
+          </wd-input>
+        </view>
         <text v-if="passwordError" class="login-form__error" role="alert">{{ passwordError }}</text>
       </view>
       <text v-if="loginError" class="login-form__error login-form__error--server" role="alert">{{ loginError }}</text>
 
       <view class="login-form__options">
-        <wd-checkbox
-          v-model="remember"
-          class="login-form__remember"
-          type="square"
-          checked-color="var(--tms-primary)"
-          :disabled="loading"
-        >
-          记住我
-        </wd-checkbox>
+        <view class="login-form__remember">
+          <wd-checkbox
+            v-model="remember"
+            type="square"
+            checked-color="var(--tms-primary)"
+            :disabled="loading"
+          >
+            记住我
+          </wd-checkbox>
+        </view>
         <button
           class="login-form__link"
           hover-class="login-form__link--pressed"
@@ -199,35 +209,40 @@ function forgotPassword() {
         </button>
       </view>
 
-      <wd-button
-        class="login-form__button"
-        custom-class="tms-primary-action"
-        type="primary"
-        size="large"
-        block
-        :round="false"
-        :loading="loading"
-        :disabled="loading"
-        @click="submit"
-      >
-        登录
-      </wd-button>
+      <view class="login-form__button">
+        <wd-button
+          custom-class="tms-primary-action"
+          type="primary"
+          size="large"
+          block
+          :round="false"
+          :loading="loading"
+          :disabled="loading"
+          @click="submit"
+        >
+          登录
+        </wd-button>
+      </view>
     </view>
 
     <!-- #ifdef MP-WEIXIN -->
-    <wd-button
-      class="login-page__phone"
-      open-type="getPhoneNumber"
-      variant="text"
-      :loading="phoneLoading"
-      :disabled="phoneLoading"
-      @getphonenumber="phoneLogin"
-    >
-      <view class="login-page__phone-icon">
-        <TmsIcon name="mobile" size="54rpx" />
-      </view>
-      <text>手机一键登录</text>
-    </wd-button>
+    <view class="login-page__phone-wrap">
+      <wd-button
+        open-type="getPhoneNumber"
+        variant="text"
+        custom-style="width: 220rpx; min-width: 110px; height: 130rpx; min-height: 65px; margin: 0; padding: 0; border: 0; color: #748096; background: transparent; box-shadow: none; opacity: 1;"
+        :disabled="phoneLoading"
+        @getphonenumber="phoneLogin"
+      >
+        <view class="login-page__phone-content">
+          <view class="login-page__phone-icon">
+            <wd-loading v-if="phoneLoading" type="circular" color="#ffffff" size="34rpx" />
+            <TmsIcon v-else name="mobile" size="44rpx" />
+          </view>
+          <text>{{ phoneLoading ? '正在登录…' : '手机一键登录' }}</text>
+        </view>
+      </wd-button>
+    </view>
     <!-- #endif -->
     <view class="login-page__agreement">
       司机账号由车队管理员开通与管理
@@ -291,14 +306,20 @@ function forgotPassword() {
 
 .login-page__hero,
 .login-form,
-.login-page__phone,
+.login-page__phone-wrap,
 .login-page__agreement {
   position: relative;
   z-index: 1;
+  flex-shrink: 0;
 }
 
 .login-page__hero {
   padding: 0 14rpx;
+}
+
+.login-page__hero,
+.login-form {
+  flex-shrink: 0;
 }
 
 .login-page__brand {
@@ -473,14 +494,12 @@ function forgotPassword() {
 }
 
 .login-form__field {
-  box-sizing: border-box;
   height: 98rpx;
   min-height: 44px;
-  padding: 0 28rpx;
   border: 1rpx solid #e8ecf3;
   border-radius: 16rpx;
   background: linear-gradient(145deg, #f8fafc, #f5f7fb);
-  color: #9aa5b7;
+  overflow: hidden;
 }
 
 .login-form__control + .login-form__control {
@@ -499,11 +518,13 @@ function forgotPassword() {
   border-color: #e5484d;
 }
 
+.login-form__field--focused,
 .login-form__field:focus-within {
   border-color: var(--tms-primary);
   box-shadow: 0 0 0 3px rgba(var(--tms-primary-rgb), 0.13);
 }
 
+.login-form__control--error .login-form__field--focused,
 .login-form__control--error .login-form__field:focus-within {
   border-color: #e5484d;
   box-shadow: 0 0 0 3px rgba(229, 72, 77, 0.13);
@@ -521,39 +542,9 @@ function forgotPassword() {
   margin-top: 18rpx;
 }
 
-.login-form__field :deep(.wd-input__value) {
-  height: 98rpx;
-  min-height: 44px;
-}
-
-.login-form__field :deep(.wd-input__prefix) {
-  margin-right: 24rpx;
-}
-
-.login-form__field :deep(.wd-input__icon),
-.login-form__field :deep(.wd-input__clear) {
-  color: #9aa5b7;
-  font-size: 38rpx;
-}
-
-.login-form__field :deep(.wd-input__inner) {
-  height: 98rpx;
-  min-height: 44px;
-  color: #172033;
-  font-size: max(28rpx, 12px);
-  background: transparent;
-}
-
-.login-form__field :deep(.wd-input__inner::placeholder) {
-  color: #9aa5b7;
-}
-
-.login-form__field.is-disabled {
-  opacity: 0.72;
-}
-
 .login-form__options {
-  margin-top: 24rpx;
+  margin-top: 20rpx;
+  min-height: 88rpx;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -562,7 +553,9 @@ function forgotPassword() {
 }
 
 .login-form__remember {
-  margin-bottom: 0;
+  min-height: 88rpx;
+  display: flex;
+  align-items: center;
   font-size: max(24rpx, 12px);
 }
 
@@ -579,8 +572,8 @@ function forgotPassword() {
 }
 
 .login-form__link {
-  min-height: 56rpx;
-  margin: -12rpx 0;
+  min-height: 88rpx;
+  margin: 0;
   padding: 0 4rpx 0 18rpx;
   border: 0;
   color: var(--tms-primary);
@@ -603,7 +596,7 @@ function forgotPassword() {
 }
 
 .login-form__button {
-  margin-top: 34rpx;
+  margin-top: 24rpx;
 }
 
 @media screen and (max-height: 700px) {
@@ -620,49 +613,31 @@ function forgotPassword() {
   }
 }
 
-.login-form__button.is-disabled {
-  background: var(--tms-primary-soft-strong);
-  box-shadow: none;
+.login-page__phone-wrap {
+  margin-top: 24rpx;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
 }
 
-.login-page__phone {
-  min-width: 180rpx;
-  min-height: 126rpx;
-  margin-right: auto;
-  margin-left: auto;
-  margin-top: 32rpx;
-  padding: 0;
-  border: 0;
-  line-height: 1.2;
-  color: #748096;
-  background: transparent;
+.login-page__phone-content {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 18rpx;
-  font-size: max(26rpx, 12px);
-}
-
-.login-page__phone--pressed {
-  opacity: 0.82;
-}
-
-.login-page__phone::after {
-  border: 0;
-}
-
-.login-page__phone :deep(.wd-button__content) {
-  flex-direction: column;
-  gap: 18rpx;
+  justify-content: center;
+  gap: 10rpx;
+  color: #748096;
+  font-size: max(24rpx, 12px);
+  line-height: 1.2;
 }
 
 .login-page__phone-icon {
   width: 74rpx;
   height: 74rpx;
   border-radius: 50%;
+  color: #fff;
   background: linear-gradient(135deg, #fb923c, #f59e0b);
   box-shadow: 0 12rpx 24rpx rgba(245, 158, 11, 0.22);
-  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -677,7 +652,4 @@ function forgotPassword() {
   text-align: center;
 }
 
-.login-page__agreement text {
-  color: var(--tms-primary);
-}
 </style>

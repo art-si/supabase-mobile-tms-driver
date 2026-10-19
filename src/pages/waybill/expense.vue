@@ -160,6 +160,7 @@ async function handleSuccess() {
               <small>{{ context.waybill.shipperAddress || "--" }}</small>
             </view>
             <view class="expense-waybill__line">
+              <view class="expense-waybill__line-track" />
               <TmsIcon name="arrow-right" size="24rpx" />
             </view>
             <view class="expense-waybill__station expense-waybill__station--end">
@@ -495,13 +496,12 @@ async function handleSuccess() {
   justify-content: center;
 }
 
-.expense-waybill__line::before {
+.expense-waybill__line-track {
   position: absolute;
   left: 0;
   right: 0;
   top: 50%;
   height: 2rpx;
-  content: "";
   background: linear-gradient(90deg, #d8dfed, var(--tms-primary-soft-strong), #d8dfed);
   transform: translateY(-50%);
 }
@@ -932,14 +932,14 @@ async function handleSuccess() {
     margin: 0;
   }
 
-  .expense-waybill__line::before {
+  .expense-waybill__line-track {
     top: 0;
     bottom: 0;
     left: 18rpx;
     right: auto;
-    width: 2rpx;
+    width: 3rpx;
     height: auto;
-    background: linear-gradient(#d8dfed, var(--tms-primary-soft-strong), #d8dfed);
+    background: #c7d1e4;
     transform: none;
   }
 

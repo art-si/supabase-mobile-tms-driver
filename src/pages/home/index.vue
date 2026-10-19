@@ -176,14 +176,15 @@ function handleTaskAction() {
           <text class="home-page__welcome">{{ !initialized && !driver ? '正在同步司机档案…' : `${greeting}，${driver?.driverName || '司机师傅'}` }}</text>
           <text class="home-page__summary">{{ taskSummary }}</text>
         </view>
-        <wd-button
-          class="home-page__settings"
-          aria-label="打开设置"
-          custom-style="width: 88rpx; min-width: 44px; height: 88rpx; min-height: 44px; padding: 0; border-radius: 50%; background: rgba(255,255,255,0.14); border: 2rpx solid rgba(255,255,255,0.22); color: #fff;"
-          @click="openSettings"
-        >
-          <TmsIcon name="settings" size="36rpx" />
-        </wd-button>
+        <view class="home-page__settings-wrap">
+          <wd-button
+            aria-label="打开设置"
+            custom-style="width: 88rpx; min-width: 44px; height: 88rpx; min-height: 44px; margin: 0; padding: 0; border-radius: 50%; background: rgba(255,255,255,0.14); border: 2rpx solid rgba(255,255,255,0.22); color: #fff;"
+            @click="openSettings"
+          >
+            <TmsIcon name="settings" size="36rpx" />
+          </wd-button>
+        </view>
       </view>
       <view class="home-page__company-row">
         <text class="home-page__company">{{ !initialized && !carrier ? '正在同步承运商…' : carrier?.companyName || '暂未绑定承运商' }}</text>
@@ -237,9 +238,11 @@ function handleTaskAction() {
             <text class="section-title">当前没有运输任务</text>
             <text class="empty-card__text">新任务到达后会显示在这里，也可以前往运单列表查看。</text>
           </view>
-          <wd-button class="empty-card__action" variant="text" @click="openWaybillList">
-            查看运单
-          </wd-button>
+          <view class="empty-card__action">
+            <wd-button variant="text" custom-style="min-height: 44px; padding: 0; color: var(--tms-primary); font-size: 24rpx; font-weight: 700;" @click="openWaybillList">
+              查看运单
+            </wd-button>
+          </view>
         </view>
 
         <view v-if="todoList.length" class="todo-card card">
@@ -248,9 +251,11 @@ function handleTaskAction() {
               <text class="section-eyebrow">待办任务</text>
               <text class="section-title todo-card__title">接下来</text>
             </view>
-            <wd-button class="todo-card__all" variant="text" @click="openWaybillList">
-              <text>全部</text>
-              <TmsIcon name="arrow-right" size="26rpx" />
+            <wd-button variant="text" custom-style="min-width: 44px; min-height: 44px; padding: 0; color: #748096; background: transparent; font-size: 24rpx;" @click="openWaybillList">
+              <view class="todo-card__all-content">
+                <text>全部</text>
+                <TmsIcon name="arrow-right" size="26rpx" />
+              </view>
             </wd-button>
           </view>
           <view class="todo-card__stack">
@@ -283,6 +288,7 @@ function handleTaskAction() {
             <TmsVehicleVisual
               class="vehicle-card__image"
               :photo-url="vehicle?.vehiclePhotoUrl"
+              height="90rpx"
             />
             <view class="vehicle-card__info">
               <text class="vehicle-card__plate">{{ vehicle?.plateNo || '暂无车辆' }}</text>
@@ -374,7 +380,23 @@ function handleTaskAction() {
 .home-page__identity {
   min-width: 0;
   flex: 1;
+  padding-right: 110rpx;
 }
+
+.home-page__settings-wrap {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: 0;
+  width: 88rpx;
+  height: 88rpx;
+}
+
+/* #ifdef MP-WEIXIN */
+.home-page__settings-wrap {
+  top: 64rpx;
+}
+/* #endif */
 
 .home-page__eyebrow,
 .home-page__network {
@@ -444,32 +466,6 @@ function handleTaskAction() {
   opacity: 0.82;
 }
 
-.home-page__settings {
-  flex: 0 0 88rpx;
-  width: 88rpx;
-  height: 88rpx;
-  margin: 0 0 0 auto;
-  padding: 0;
-  min-width: 0;
-  border-radius: 50%;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.14);
-  border: 2rpx solid rgba(255, 255, 255, 0.22);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.home-page__settings.is-disabled {
-  opacity: 0.72;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.14);
-}
-
-.home-page__settings::after {
-  border: 0;
-}
-
 .home-page__scroll {
   position: absolute;
   z-index: 1;
@@ -478,6 +474,17 @@ function handleTaskAction() {
   top: 336rpx;
   bottom: var(--tms-tabbar-space);
 }
+
+/* #ifdef MP-WEIXIN */
+.home-page__hero {
+  height: 504rpx;
+  padding-top: calc(102rpx + env(safe-area-inset-top));
+}
+
+.home-page__scroll {
+  top: 384rpx;
+}
+/* #endif */
 
 .home-page__content {
   position: relative;
@@ -638,10 +645,6 @@ function handleTaskAction() {
   grid-column: 2;
   justify-self: start;
   margin-top: -8rpx;
-  padding: 0;
-  color: var(--tms-primary);
-  font-size: max(23rpx, 12px);
-  font-weight: 700;
 }
 
 .todo-card {
@@ -668,16 +671,10 @@ function handleTaskAction() {
   gap: 20rpx;
 }
 
-.todo-card__all {
-  color: #748096;
-  min-width: 0;
-  padding: 0;
-  background: transparent;
-  font-size: max(24rpx, 12px);
-}
-
-.todo-card__all :deep(.wd-button__content) {
-  gap: 2rpx;
+.todo-card__all-content {
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
 }
 
 .todo-card__stack {

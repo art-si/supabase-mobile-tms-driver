@@ -40,6 +40,9 @@ const displayName = computed(
   () => driver.value?.driverName || user.value?.nickName || user.value?.userName || '司机师傅'
 )
 const avatarInitial = computed(() => Array.from(displayName.value.trim())[0] || '司')
+const avatarLoadedUrl = ref('')
+const avatarSrc = computed(() => user.value?.avatar || '')
+const avatarReady = computed(() => Boolean(avatarSrc.value && avatarLoadedUrl.value === avatarSrc.value))
 
 onShow(() => {
   void load()
@@ -124,15 +127,17 @@ async function confirmLogout() {
       <view class="mine-page__eyebrow"><text /> 司机档案</view>
       <text v-if="showSkeleton" class="mine-page__loading">正在同步司机档案…</text>
       <view v-else class="mine-page__user">
-        <image
-          v-if="user?.avatar"
-          class="mine-page__avatar"
-          :src="user.avatar"
-          mode="aspectFill"
-          :aria-label="`${displayName}的头像`"
-        />
-        <view v-else class="mine-page__avatar mine-page__avatar--text">
-          {{ avatarInitial }}
+        <view class="mine-page__avatar mine-page__avatar--text">
+          <text v-if="!avatarReady">{{ avatarInitial }}</text>
+          <image
+            v-if="avatarSrc"
+            class="mine-page__avatar-image"
+            :class="{ 'mine-page__avatar-image--ready': avatarReady }"
+            :src="avatarSrc"
+            mode="aspectFill"
+            :aria-label="`${displayName}的头像`"
+            @load="avatarLoadedUrl = avatarSrc"
+          />
         </view>
         <view class="mine-page__profile">
           <text class="mine-page__name">{{ displayName }}</text>
@@ -142,9 +147,8 @@ async function confirmLogout() {
           <view class="mine-page__verified"><TmsIcon name="success" size="24rpx" /> 司机档案已同步</view>
         </view>
         <wd-button
-          class="mine-page__setting"
           aria-label="刷新司机档案"
-          custom-style="width: 88rpx; min-width: 44px; height: 88rpx; min-height: 44px; padding: 0; border-radius: 50%; background: rgba(255,255,255,0.14); border: 2rpx solid rgba(255,255,255,0.22); color: #fff;"
+          custom-style="width: 88rpx; min-width: 44px; height: 88rpx; min-height: 44px; margin: 0; padding: 0; border-radius: 50%; background: rgba(255,255,255,0.14); border: 2rpx solid rgba(255,255,255,0.22); color: #fff; display: flex; align-items: center; justify-content: center;"
           :disabled="syncing"
           @click="refreshProfile"
         >
@@ -168,7 +172,9 @@ async function confirmLogout() {
           </view>
           <text class="section-head__hint">累计数据</text>
         </view>
-        <TmsMetricGrid class="mine-card__metrics" :items="metrics" />
+        <view class="mine-card__metrics">
+          <TmsMetricGrid :items="metrics" />
+        </view>
       </view>
 
       <view class="mine-card card">
@@ -209,7 +215,9 @@ async function confirmLogout() {
             <text class="mine-settings-link__title">主题配色</text>
             <text class="mine-settings-link__description">管理全局外观</text>
           </view>
-          <TmsIcon name="arrow-right" size="28rpx" />
+          <view class="mine-settings-link__chevron">
+            <TmsIcon name="arrow-right" size="28rpx" />
+          </view>
         </button>
       </view>
 
@@ -314,6 +322,13 @@ async function confirmLogout() {
   border-bottom-right-radius: 46rpx;
 }
 
+/* #ifdef MP-WEIXIN */
+.mine-page__hero {
+  height: 410rpx;
+  padding-top: calc(94rpx + env(safe-area-inset-top));
+}
+/* #endif */
+
 .mine-page__hero::after {
   position: absolute;
   top: -240rpx;
@@ -391,6 +406,7 @@ async function confirmLogout() {
 }
 
 .mine-page__avatar {
+  position: relative;
   width: 94rpx;
   height: 94rpx;
   border: 4rpx solid rgba(255, 255, 255, 0.24);
@@ -405,6 +421,19 @@ async function confirmLogout() {
   justify-content: center;
   font-size: max(28rpx, 12px);
   font-weight: 700;
+}
+
+.mine-page__avatar-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  opacity: 0;
+}
+
+.mine-page__avatar-image--ready {
+  opacity: 1;
 }
 
 .mine-page__profile {
@@ -440,28 +469,6 @@ async function confirmLogout() {
   gap: 6rpx;
   font-size: max(20rpx, 12px);
   font-weight: 700;
-}
-
-.mine-page__setting {
-  width: var(--tms-control-height);
-  height: var(--tms-control-height);
-  margin: 0;
-  padding: 0;
-  border-radius: 50%;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1rpx solid rgba(255, 255, 255, 0.18);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.mine-page__setting::after {
-  border: 0;
-}
-
-.mine-page__setting--pressed {
-  background: rgba(255, 255, 255, 0.22);
 }
 
 .mine-page__content {
@@ -595,7 +602,7 @@ async function confirmLogout() {
   font-size: max(22rpx, 12px);
 }
 
-.mine-settings-link > :last-child {
+.mine-settings-link__chevron {
   color: var(--tms-muted);
 }
 

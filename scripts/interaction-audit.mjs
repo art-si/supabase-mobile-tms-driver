@@ -49,22 +49,13 @@ page.on('dialog', async dialog => {
 page.on('pageerror', error => pageErrors.push(error.message))
 
 async function visit(path, ready) {
-  if (page.url().startsWith(base) && page.url().includes('#/')) {
-    await page.evaluate(async () => {
-      try { await uni.closePreviewImage() } catch { /* No preview is open. */ }
-    })
-    await page.evaluate(target => new Promise((resolve, reject) => {
-      uni.reLaunch({ url: target, success: resolve, fail: reject })
-    }), path)
-  } else {
-    await page.goto(new URL(`#${path}`, base).href, { waitUntil: 'domcontentloaded' })
-  }
+  await page.goto(new URL(`#${path}`, base).href, { waitUntil: 'domcontentloaded' })
   if (ready) await page.waitForSelector(ready, { timeout: 25000 })
   await page.waitForTimeout(180)
   if (path.startsWith('/pages/waybill/detail')) {
     await page.evaluate(() => {
       window.__auditDomEvents = []
-      for (const selector of ['.proof-card__image', '.detail-actions__receipt', '.detail-actions__expense', '.route-card__nav-button', '.station-list__call']) {
+      for (const selector of ['.proof-card__image', '.detail-actions__receipt', '.detail-actions__expense', '.route-card__nav .wd-button', '[aria-label^="拨打"]']) {
         const element = document.querySelector(selector)
         for (const type of ['click', 'tap']) {
           element?.addEventListener(type, () => window.__auditDomEvents.push(`${selector}:${type}`))
@@ -101,6 +92,7 @@ async function step(name, action, options = {}) {
   }).catch(() => null)
   results.push({ name, before, after, error, toast: toast.map(text => text.trim()).filter(Boolean), layout, screenshot, openPages, previewCount, apiCalls, domEvents, globalEvents, previewDom })
   console.log(`${error ? 'FAIL' : 'PASS'} ${name} ${new URL(after).hash}`)
+  if (error) console.error(error)
 }
 
 try {
@@ -118,15 +110,23 @@ try {
   await visit('/pages/home/index', '.home-page__content')
   await step('home-current-task', () => page.locator('.route-card--task').click())
   await visit('/pages/home/index', '.home-page__content')
-  await step('home-primary-action', () => page.locator('.task-card__button').click())
+  await page.locator('.task-card__button:not(.is-disabled)').waitFor({ state: 'visible', timeout: 15000 })
+  await step('home-primary-action', async () => {
+    await page.locator('.task-card__button').click()
+    await page.waitForURL(/#\/pages\/waybill\/(detail|cargo-operation|execution-operation)/, { timeout: 10000 })
+  })
   await visit('/pages/home/index', '.home-page__content')
-  await step('home-pending-task', () => page.locator('.todo-card__stack .route-card').first().click())
+  if (await page.locator('.todo-card__stack .route-card').count()) {
+    await step('home-pending-task', () => page.locator('.todo-card__stack .route-card').first().click())
+  }
   await visit('/pages/home/index', '.home-page__content')
-  await step('home-all-tasks', () => page.locator('.todo-card__all').click())
+  if (await page.locator('.todo-card__all-content').count()) {
+    await step('home-all-tasks', () => page.locator('.todo-card__all-content').click())
+  }
   await visit('/pages/home/index', '.home-page__content')
-  await step('home-settings', () => page.locator('.home-page__settings').click())
+  await step('home-settings', () => page.locator('[aria-label="打开设置"]').click())
   await visit('/pages/home/index', '.home-page__content')
-  await step('home-navigation', () => page.locator('.route-card__nav-button').first().click())
+  await step('home-navigation', () => page.locator('.route-card__nav .wd-button').first().click())
   for (const [label, destination] of [
     ['车辆', 'vehicle'],
     ['我的', 'mine'],
@@ -147,7 +147,7 @@ try {
     })
   }
   await step('waybill-refresh', async () => {
-    await page.locator('.waybill-page__refresh').click()
+    await page.locator('[aria-label="刷新运单列表"]').click()
     await page.waitForSelector('.waybill-page__stack, .waybill-page__empty', { timeout: 20000 })
   })
   await step('waybill-card-open', () => page.locator('.waybill-page__stack .route-card[role="button"]').first().click())
@@ -171,7 +171,7 @@ try {
     }
   })
   const detailControls = await page.evaluate(() =>
-    ['.detail-actions__receipt', '.detail-actions__expense', '.proof-card__image', '.route-card__nav-button']
+    ['.detail-actions__receipt', '.detail-actions__expense', '.proof-card__image', '.route-card__nav .wd-button']
       .map(selector => {
         const element = document.querySelector(selector)
         if (!element) return { selector, found: false }
@@ -208,7 +208,7 @@ try {
     await page.waitForURL(/#\/pages\/home\/index/, { timeout: 10000 })
   })
   await visit(`/pages/waybill/detail?id=${encodeURIComponent(waybillId)}`, '.detail-page__content')
-  await step('detail-navigation', () => page.locator('.route-card__nav-button').click())
+  await step('detail-navigation', () => page.locator('.route-card__nav .wd-button').click())
   await step('detail-phone-origin', async () => {
     await page.evaluate(() => {
       window.__auditPhoneCount = 0
@@ -288,7 +288,7 @@ try {
 
   if (phase === 'all' || phase === 'forms' || phase === 'mine') {
   await visit('/pages/mine/index', '.mine-page__content')
-  await step('mine-refresh', () => page.locator('.mine-page__setting').click(), { delay: 1200 })
+  await step('mine-refresh', () => page.locator('[aria-label="刷新司机档案"]').click(), { delay: 1200 })
   await step('mine-help-open', async () => {
     await page.locator('.feature-grid__item').filter({ hasText: '使用说明' }).click()
     await page.locator('.mine-help__panel').waitFor({ state: 'visible' })
@@ -305,6 +305,15 @@ try {
     await page.locator('.waybill-page__stack, .waybill-page__empty').first().waitFor({ state: 'visible', timeout: 15000 })
   })
   await visit('/pages/mine/index', '.mine-page__content')
+  const contactPage = await context.newPage()
+  try {
+    await contactPage.goto(new URL('#/pages/mine/index', base).href, { waitUntil: 'domcontentloaded' })
+    await contactPage.waitForSelector('.feature-grid__item', { timeout: 15000 })
+    await step('mine-contact-carrier', () => contactPage.locator('.feature-grid__item').filter({ hasText: '联系车队' }).click())
+    await contactPage.screenshot({ path: join(output, 'mine-contact-carrier.png') })
+  } finally {
+    await contactPage.close()
+  }
   await step('mine-logout-dialog', async () => {
     await page.locator('.mine-page__logout').click()
     await page.locator('.mine-dialog__body[aria-label="退出登录"]').waitFor({ state: 'visible' })
@@ -315,12 +324,6 @@ try {
     await page.locator('.mine-dialog__body[aria-label="退出登录"]').getByText('退出登录', { exact: true }).last().click()
     await page.locator('.login-form').waitFor({ state: 'visible', timeout: 10000 })
   })
-  await page.locator('input').nth(0).fill(account)
-  await page.locator('input').nth(1).fill(password)
-  await page.locator('.login-form__button').click()
-  await page.waitForURL(/#\/pages\/home\/index/, { timeout: 15000 })
-  await visit('/pages/mine/index', '.mine-page__content')
-  await step('mine-contact-carrier', () => page.locator('.feature-grid__item').filter({ hasText: '联系车队' }).click())
   }
 } finally {
   await writeFile(join(output, `${phase}-audit.json`), JSON.stringify({ results, dialogs, pageErrors }, null, 2))

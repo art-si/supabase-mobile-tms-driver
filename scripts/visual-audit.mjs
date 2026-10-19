@@ -6,10 +6,13 @@ const account = process.env.TMS_AUDIT_ACCOUNT || process.argv[2]
 const password = process.env.TMS_AUDIT_PASSWORD || process.argv[3]
 const width = Number(process.env.TMS_AUDIT_WIDTH || process.argv[5] || 393)
 const height = Number(process.env.TMS_AUDIT_HEIGHT || 852)
-const waybillId = process.env.TMS_AUDIT_WAYBILL_ID || '9ca1a6d0-a3f9-45fb-adea-53ffbddf3715'
+const requestedWaybillId = process.env.TMS_AUDIT_WAYBILL_ID || ''
 const output = resolve(process.env.TMS_AUDIT_OUTPUT || 'artifacts/visual-audit')
 const base = process.env.TMS_AUDIT_BASE || 'http://127.0.0.1:5173/'
 const only = process.env.TMS_AUDIT_ONLY || process.argv[4]
+const selectedPages = new Set(only?.split(',') || [])
+const wantsPage = name => !only || only === 'all' || selectedPages.has(name)
+const waybillPages = ['detail', 'cargo-loading', 'cargo-unloading', 'execution-departure', 'execution-completion', 'expense']
 
 if (!account || !password) {
   throw new Error('Set TMS_AUDIT_ACCOUNT and TMS_AUDIT_PASSWORD before running the visual audit.')
@@ -30,6 +33,8 @@ const page = await context.newPage()
 const errors = []
 const results = []
 const dictionaryResponses = []
+const accessibleWaybills = new Map()
+const activeRequests = new Map()
 const readySelectors = {
   home: '.home-page__content',
   waybill: '.waybill-page__stack, .waybill-page__empty',
@@ -41,9 +46,13 @@ const readySelectors = {
   expense: '.expense-page__content',
   vehicle: '.vehicle-card',
   mine: '.mine-page__content',
+  settings: '.settings-page__content',
 }
 
 page.on('pageerror', error => errors.push({ type: 'pageerror', message: error.message }))
+page.on('request', request => activeRequests.set(request, Date.now()))
+page.on('requestfinished', request => activeRequests.delete(request))
+page.on('requestfailed', request => activeRequests.delete(request))
 page.on('console', message => {
   if (message.type() === 'error') errors.push({ type: 'console', message: message.text(), location: message.location() })
 })
@@ -52,6 +61,14 @@ page.on('response', async response => {
     errors.push({ type: 'http', status: response.status(), url: response.url() })
   }
   const pathname = new URL(response.url()).pathname
+  if (pathname.endsWith('/rpc/tms_list_driver_mobile_waybills') && response.ok()) {
+    const rows = await response.json().catch(() => [])
+    if (Array.isArray(rows)) {
+      for (const row of rows) {
+        if (typeof row?.id === 'string') accessibleWaybills.set(row.id, row)
+      }
+    }
+  }
   if (!/\/(sys_dict_type|sys_dictionary)$/.test(pathname)) return
   const data = await response.json().catch(() => null)
   dictionaryResponses.push({
@@ -68,7 +85,12 @@ async function capture(name, path) {
   }
   if (readySelectors[name]) {
     await page.waitForSelector(readySelectors[name], { timeout: 20000 }).catch(() => {
-      errors.push({ type: 'readiness', page: name, message: 'Page content did not become ready within 20 seconds' })
+      errors.push({
+        type: 'readiness',
+        page: name,
+        message: 'Page content did not become ready within 20 seconds',
+        pending: [...activeRequests.keys()].map(request => new URL(request.url()).pathname)
+      })
     })
   }
   await page.waitForTimeout(350)
@@ -144,9 +166,20 @@ try {
   await page.locator('.login-form__button').click()
   await page.waitForURL(/#\/pages\/home\/index/, { timeout: 20000 })
 
-  const routes = [
+  const mainRoutes = [
     ['home', '/pages/home/index'],
     ['waybill', '/pages/waybill/index'],
+  ]
+  const needsWaybill = !requestedWaybillId && waybillPages.some(wantsPage)
+
+  for (const [name, path] of mainRoutes) {
+    if (wantsPage(name) || (name === 'waybill' && needsWaybill)) await capture(name, path)
+  }
+
+  const waybillId = requestedWaybillId ||
+    [...accessibleWaybills.values()].find(item => ['accepted', 'loading', 'transporting', 'unloading', 'signed'].includes(item.status))?.id ||
+    accessibleWaybills.keys().next().value
+  const routes = [
     ['detail', `/pages/waybill/detail?id=${encodeURIComponent(waybillId)}`],
     ['cargo-loading', `/pages/waybill/cargo-operation?id=${encodeURIComponent(waybillId)}&type=loading`],
     ['cargo-unloading', `/pages/waybill/cargo-operation?id=${encodeURIComponent(waybillId)}&type=unloading`],
@@ -155,10 +188,17 @@ try {
     ['expense', `/pages/waybill/expense?id=${encodeURIComponent(waybillId)}`],
     ['vehicle', '/pages/vehicle/index'],
     ['mine', '/pages/mine/index'],
+    ['settings', '/pages/settings/index'],
   ]
 
   for (const [name, path] of routes) {
-    if (!only || only === 'all' || only.split(',').includes(name)) await capture(name, path)
+    if (wantsPage(name)) {
+      if (!waybillId && waybillPages.includes(name)) {
+        errors.push({ type: 'readiness', page: name, message: 'No accessible waybill for visual audit' })
+        continue
+      }
+      await capture(name, path)
+    }
   }
 } finally {
   await writeFile(join(output, `${width}-audit.json`), JSON.stringify({ results, errors, dictionaryResponses }, null, 2))

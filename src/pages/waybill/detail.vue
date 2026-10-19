@@ -460,47 +460,50 @@ function viewReceipt(current?: string) {
             </view>
 
             <view class="detail-actions__controls">
-              <wd-button
-                v-if="isAccepted"
-                class="detail-actions__outline"
-                custom-class="tms-danger-action"
-                type="danger"
-                variant="plain"
-                :round="false"
-                :disabled="actionBusy"
-                @click="cancel"
-              >
-                <view class="detail-actions__button-content">
-                  <wd-loading
-                    v-if="activeAction === 'cancel'"
-                    type="circular"
-                    color="#dc2626"
-                    size="28rpx"
-                  />
-                  <TmsIcon v-else name="close" size="28rpx" />
-                  <text>{{
-                    activeAction === "cancel" ? "正在取消" : "取消运单"
-                  }}</text>
-                </view>
-              </wd-button>
-              <wd-button
-                v-if="isAccepted"
-                class="detail-actions__primary"
-                custom-class="tms-primary-action"
-                type="primary"
-                :round="false"
-                :disabled="actionBusy"
-                @click="openCargoOperation('loading')"
-              >
-                <view class="detail-actions__button-content">
-                  <TmsIcon name="location" size="30rpx" />
-                  <text>装货打卡</text>
-                </view>
-              </wd-button>
+              <view v-if="isAccepted" class="detail-actions__outline">
+                <wd-button
+                  custom-class="tms-danger-action"
+                  type="danger"
+                  variant="plain"
+                  block
+                  :round="false"
+                  :disabled="actionBusy"
+                  @click="cancel"
+                >
+                  <view class="detail-actions__button-content">
+                    <wd-loading
+                      v-if="activeAction === 'cancel'"
+                      type="circular"
+                      color="#dc2626"
+                      size="28rpx"
+                    />
+                    <TmsIcon v-else name="close" size="28rpx" />
+                    <text>{{
+                      activeAction === "cancel" ? "正在取消" : "取消运单"
+                    }}</text>
+                  </view>
+                </wd-button>
+              </view>
+              <view v-if="isAccepted" class="detail-actions__primary">
+                <wd-button
+                  custom-class="tms-primary-action"
+                  type="primary"
+                  block
+                  :round="false"
+                  :disabled="actionBusy"
+                  @click="openCargoOperation('loading')"
+                >
+                  <view class="detail-actions__button-content">
+                    <TmsIcon name="location" size="30rpx" />
+                    <text>装货打卡</text>
+                  </view>
+                </wd-button>
+              </view>
               <wd-button
                 v-else-if="isLoading"
                 class="detail-actions__primary detail-actions__primary--wide"
                 custom-class="tms-primary-action"
+                custom-style="width: 100%;"
                 type="primary"
                 :round="false"
                 :disabled="actionBusy"
@@ -515,6 +518,7 @@ function viewReceipt(current?: string) {
                 v-else-if="isTransporting"
                 class="detail-actions__primary detail-actions__primary--wide"
                 custom-class="tms-primary-action"
+                custom-style="width: 100%;"
                 type="primary"
                 :round="false"
                 :disabled="actionBusy"
@@ -529,6 +533,7 @@ function viewReceipt(current?: string) {
                 v-else-if="isUnloading"
                 class="detail-actions__primary detail-actions__primary--wide"
                 custom-class="tms-primary-action"
+                custom-style="width: 100%;"
                 type="primary"
                 :round="false"
                 :disabled="actionBusy"
@@ -558,6 +563,7 @@ function viewReceipt(current?: string) {
                 v-else-if="isSigned || needsReturnCompletion"
                 class="detail-actions__primary detail-actions__primary--wide"
                 custom-class="tms-primary-action"
+                custom-style="width: 100%;"
                 type="primary"
                 :round="false"
                 :disabled="actionBusy"
@@ -574,6 +580,7 @@ function viewReceipt(current?: string) {
                 v-else-if="isCompleted"
                 class="detail-actions__receipt"
                 custom-class="tms-secondary-action"
+                custom-style="width: 100%;"
                 type="primary"
                 variant="plain"
                 :round="false"
@@ -690,9 +697,8 @@ function viewReceipt(current?: string) {
                 <text class="station-list__address">{{ row.address }}</text>
               </view>
               <wd-button
-                class="station-list__call"
                 :aria-label="`拨打${row.label}电话`"
-                custom-style="width: 88rpx; min-width: 44px; height: 88rpx; min-height: 44px; padding: 0; border-radius: 50%; background: #25bf75; color: #fff;"
+                custom-style="width: 88rpx; min-width: 44px; height: 88rpx; min-height: 44px; padding: 0; border-radius: 50%; background: #25bf75; color: #fff; box-shadow: 0 10rpx 20rpx rgba(16, 185, 129, 0.2);"
                 @click="callPhone(row.phone)"
               >
                 <TmsIcon name="phone" size="38rpx" />
@@ -754,27 +760,29 @@ function viewReceipt(current?: string) {
           formatMoney(current.freightAmount)
         }}</text>
       </view>
-      <wd-button
-        class="pending-footer__button"
-        custom-class="tms-primary-action"
-        type="primary"
-        :round="false"
-        :disabled="actionBusy"
-        @click="accept"
-      >
-        <view class="detail-actions__button-content">
-          <wd-loading
-            v-if="activeAction === 'accept'"
-            type="circular"
-            color="#ffffff"
-            size="30rpx"
-          />
-          <TmsIcon v-else name="success" size="32rpx" />
-          <text>{{
-            activeAction === "accept" ? "正在接受任务" : "确认接受任务"
-          }}</text>
-        </view>
-      </wd-button>
+      <view class="pending-footer__button">
+        <wd-button
+          custom-class="tms-primary-action"
+          type="primary"
+          block
+          :round="false"
+          :disabled="actionBusy"
+          @click="accept"
+        >
+          <view class="detail-actions__button-content">
+            <wd-loading
+              v-if="activeAction === 'accept'"
+              type="circular"
+              color="#ffffff"
+              size="30rpx"
+            />
+            <TmsIcon v-else name="success" size="32rpx" />
+            <text>{{
+              activeAction === "accept" ? "正在接受任务" : "确认接受任务"
+            }}</text>
+          </view>
+        </wd-button>
+      </view>
     </view>
 
     <WaybillSignatureSheet
@@ -1154,18 +1162,6 @@ function viewReceipt(current?: string) {
   -webkit-box-orient: vertical;
 }
 
-.station-list__call {
-  width: 88rpx;
-  height: 88rpx;
-  min-width: 44px;
-  min-height: 44px;
-  padding: 0;
-  border-radius: 50%;
-  color: #fff;
-  background: #10b981;
-  box-shadow: 0 10rpx 20rpx rgba(16, 185, 129, 0.2);
-}
-
 .proof-card__grid {
   margin-top: 26rpx;
   display: grid;
@@ -1260,7 +1256,4 @@ function viewReceipt(current?: string) {
   min-width: 0;
 }
 
-.pending-footer__button :deep(.wd-button__content) {
-  gap: 10rpx;
-}
 </style>

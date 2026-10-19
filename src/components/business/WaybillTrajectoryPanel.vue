@@ -24,6 +24,11 @@ const props = withDefaults(
   { events: () => [] },
 );
 
+let mapRouteAvailable = true;
+// #ifndef H5
+mapRouteAvailable = Boolean(import.meta.env.VITE_AMAP_WEB_SERVICE_KEY);
+// #endif
+
 const actionLabels: Record<string, string> = {
   accept: "接受任务",
   loading_checkin: "装货定位打卡",
@@ -158,7 +163,7 @@ const traceDescription = computed(() => {
         route-mode="nodes"
         embedded
       />
-      <view class="trajectory-panel__legend">
+      <view v-if="mapRouteAvailable" class="trajectory-panel__legend">
         <view class="trajectory-panel__legend-item">
           <view class="trajectory-panel__legend-icon is-route" aria-hidden="true" />
           <text>车行路线</text>

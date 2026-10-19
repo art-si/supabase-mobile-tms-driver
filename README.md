@@ -66,6 +66,7 @@ pnpm dev:h5
 
 ```env
 VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_MP_URL=
 VITE_SUPABASE_KEY=your-publishable-or-anon-key
 VITE_AMAP_KEY=
 VITE_AMAP_SECURITY_JS_CODE=
@@ -81,6 +82,7 @@ pnpm build:mp-weixin
 ```
 
 H5 生产文件输出到 `docs/`。微信小程序还需要在开发者工具和平台后台配置 AppID、合法域名、定位/相册/相机权限与手机号授权能力。
+若手机网络无法直连 Supabase，可将 `VITE_SUPABASE_MP_URL` 设为可直达的 HTTPS 代理域名；H5 仍使用 `VITE_SUPABASE_URL`。该域名须在小程序后台配置为 request、uploadFile 和 downloadFile 合法域名，并转发 `/auth/v1`、`/rest/v1`、`/functions/v1` 与 `/storage/v1`。
 
 ## 安全边界
 

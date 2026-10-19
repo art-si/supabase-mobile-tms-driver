@@ -41,7 +41,7 @@ const currentStep = computed(() => getStatusStep(props.status))
           'progress__dot--current': index === currentStep
         }"
       >
-        <TmsIcon v-if="index < currentStep" name="check" size="16rpx" class="progress__check" />
+        <TmsIcon v-if="index < currentStep" name="check" size="16rpx" />
       </view>
     </view>
   </view>
@@ -143,6 +143,7 @@ const currentStep = computed(() => getStatusStep(props.status))
   border: 0;
   background: var(--tms-primary);
   box-shadow: 0 0 0 3rpx var(--tms-primary-soft-strong);
+  color: #fff;
 }
 
 .progress__dot--current {
@@ -153,7 +154,4 @@ const currentStep = computed(() => getStatusStep(props.status))
   box-shadow: 0 0 0 4rpx rgba(55, 99, 244, 0.24);
 }
 
-.progress__check {
-  color: #fff;
-}
 </style>

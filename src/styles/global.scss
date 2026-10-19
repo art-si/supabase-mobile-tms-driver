@@ -1,5 +1,6 @@
 @use '@wot-ui/ui/styles/theme/index.scss' as *;
 @use './presets.scss';
+@use './font.scss';
 
 @font-face {
   font-family: 'TMS Icons';
@@ -12,7 +13,7 @@
 :root,
 page,
 .wd-root-portal {
-  --tms-font-family: 'HarmonyOS Sans SC', 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+  --tms-font-family: 'TMS Sans SC', 'HarmonyOS Sans SC', 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
   --wot-typography-title-font-family: var(--tms-font-family);
   --wot-typography-body-font-family: var(--tms-font-family);
   --wot-typography-label-font-family: var(--tms-font-family);
@@ -141,6 +142,20 @@ page,
   line-height: 1.2;
 }
 
+.tms-inline-action {
+  height: 100%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.2;
+}
+
+.tms-inline-action > text {
+  margin-left: 8rpx;
+  line-height: 1.2;
+}
+
 .required-mark {
   margin-left: 6rpx;
   color: #ef4d57 !important;
@@ -155,7 +170,7 @@ page,
   padding: 0 20rpx;
   border: 1rpx solid var(--tms-line);
   border-radius: 12rpx;
-  background: var(--tms-panel);
+  background: #fff;
   display: flex;
   align-items: center;
 }
@@ -233,11 +248,12 @@ page,
   padding: 18rpx 20rpx 46rpx;
   border: 1rpx solid var(--tms-line);
   border-radius: 16rpx;
-  background: var(--tms-panel);
+  background: #fff;
 }
 
 .wd-textarea.tms-form-textarea .wd-textarea__inner {
   min-height: 82rpx;
+  background: #fff;
   color: var(--tms-text);
   font-size: max(25rpx, 12px);
 }
@@ -283,6 +299,7 @@ page,
   }
 }
 
+/* #ifdef H5 */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -293,3 +310,4 @@ page,
     transition-duration: 0.01ms !important;
   }
 }
+/* #endif */

@@ -30,7 +30,7 @@ function back() {
 </script>
 
 <template>
-  <view class="top-bar">
+  <view class="top-bar" :class="{ 'top-bar--with-meta': eyebrow || subtitle }">
     <view class="top-bar__glow" />
     <button
       v-if="showBack"
@@ -73,6 +73,13 @@ function back() {
   align-items: center;
   gap: 18rpx;
 }
+
+/* #ifdef MP-WEIXIN */
+.top-bar--with-meta {
+  min-height: 250rpx;
+  padding-top: calc(110rpx + env(safe-area-inset-top));
+}
+/* #endif */
 
 .top-bar::after {
   position: absolute;

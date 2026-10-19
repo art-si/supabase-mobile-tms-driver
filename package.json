@@ -10,6 +10,7 @@
     "build:mp-weixin": "uni build -p mp-weixin",
     "typecheck": "vue-tsc --noEmit --pretty false",
     "icons:build": "node scripts/build-icons.mjs",
+    "font:css": "node scripts/build-ui-font-css.mjs",
     "audit:visual": "node scripts/visual-audit.mjs",
     "audit:interactions": "node scripts/interaction-audit.mjs",
     "audit:expense-layout": "node scripts/expense-layout-audit.mjs"

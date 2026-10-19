@@ -37,8 +37,7 @@ function go(value: string | number) {
         v-for="item in items"
         :key="item.key"
         :name="item.key"
-        custom-class="bottom-nav__item"
-        :class="{ 'bottom-nav__item--active': item.key === props.active }"
+        :custom-class="item.key === props.active ? 'bottom-nav__item bottom-nav__item--active' : 'bottom-nav__item'"
         :aria-label="item.label"
         :aria-current="item.key === props.active ? 'page' : undefined"
         role="link"
@@ -46,11 +45,13 @@ function go(value: string | number) {
         @keydown.enter="go(item.key)"
         @keydown.space.prevent="go(item.key)"
       >
-        <view v-if="item.key === props.active" class="bottom-nav__active-pill" />
-        <view class="bottom-nav__icon-box">
-          <TmsIcon :name="item.icon" size="44rpx" />
+        <view class="bottom-nav__content">
+          <view v-if="item.key === props.active" class="bottom-nav__active-pill" />
+          <view class="bottom-nav__icon-box" :class="{ 'bottom-nav__icon-box--active': item.key === props.active }">
+            <TmsIcon :name="item.icon" size="44rpx" />
+          </view>
+          <text class="bottom-nav__label" :class="{ 'bottom-nav__label--active': item.key === props.active }">{{ item.label }}</text>
         </view>
-        <text>{{ item.label }}</text>
       </wd-tabbar-item>
     </wd-tabbar>
   </view>
@@ -126,6 +127,18 @@ function go(value: string | number) {
   background: linear-gradient(180deg, var(--tms-primary-soft), var(--tms-primary-soft-strong));
 }
 
+.bottom-nav__content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2rpx;
+}
+
 .bottom-nav__icon-box {
   position: relative;
   z-index: 1;
@@ -136,6 +149,19 @@ function go(value: string | number) {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.bottom-nav__label {
+  color: #929daf;
+}
+
+.bottom-nav__icon-box--active,
+.bottom-nav__label--active {
+  color: var(--tms-primary);
+}
+
+.bottom-nav__label--active {
+  font-weight: 700;
 }
 
 :deep(.bottom-nav__item--active) .bottom-nav__icon-box {
