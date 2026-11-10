@@ -24,10 +24,10 @@ withDefaults(
   min-width: 0;
   margin-top: 16rpx;
   padding: 18rpx 20rpx;
-  border: 1rpx solid #dbe6ff;
+  border: 1rpx solid rgba(var(--tms-primary-rgb), 0.16);
   border-radius: 16rpx;
-  color: #315ea8;
-  background: #eef5ff;
+  color: var(--tms-info);
+  background: var(--tms-info-soft);
   display: flex;
   align-items: flex-start;
   gap: 12rpx;

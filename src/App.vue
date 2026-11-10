@@ -39,13 +39,49 @@ page {
   min-height: 100%;
   background: var(--tms-bg);
   color: var(--tms-text);
+  overflow-x: hidden;
   font-family: var(--tms-font-family);
   font-weight: 400;
   font-synthesis: none;
   font-variant-numeric: tabular-nums;
+  font-optical-sizing: auto;
+  letter-spacing: 0.01em;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
+
+/* #ifdef H5 */
+html,
+body {
+  min-width: 320px;
+  margin: 0;
+  overflow-x: hidden;
+  background: var(--tms-bg);
+}
+
+@media (pointer: fine) {
+  html {
+    overscroll-behavior: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  page,
+  .card,
+  .bottom-nav {
+    background: var(--tms-surface) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .card,
+  .bottom-nav {
+    border-color: var(--tms-text-secondary) !important;
+  }
+}
+/* #endif */
 
 view,
 text,
@@ -140,6 +176,10 @@ uni-scroll-view .uni-scroll-view {
 uni-scroll-view .uni-scroll-view::-webkit-scrollbar {
   width: 0;
   height: 0;
+}
+
+uni-scroll-view .uni-scroll-view {
+  overscroll-behavior: contain;
 }
 /* #endif */
 

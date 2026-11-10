@@ -331,7 +331,10 @@ function navigate(item: Waybill) {
 
 .waybill-page__tabs {
   padding: 18rpx 28rpx 20rpx;
-  background: rgba(255, 255, 255, 0.96);
+  background: var(--tms-material-thin);
+  border-bottom: 1rpx solid var(--tms-line-subtle);
+  backdrop-filter: blur(18rpx) saturate(140%);
+  -webkit-backdrop-filter: blur(18rpx) saturate(140%);
   display: flex;
 }
 
@@ -343,9 +346,9 @@ function navigate(item: Waybill) {
   margin: 0;
   padding: 0 10rpx;
   border-radius: 999rpx;
-  color: #505867;
-  border: 1rpx solid #edf0f5;
-  background: #f5f7fb;
+  color: var(--tms-text-secondary);
+  border: 1rpx solid var(--tms-line-subtle);
+  background: var(--tms-surface-muted);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -371,8 +374,8 @@ function navigate(item: Waybill) {
 .waybill-page__tab--active {
   color: #fff;
   border-color: transparent;
-  background: linear-gradient(135deg, var(--tms-primary), var(--tms-primary-bright));
-  box-shadow: 0 10rpx 22rpx rgba(var(--tms-primary-rgb), 0.2);
+  background: var(--tms-primary);
+  box-shadow: var(--tms-shadow-primary);
 }
 
 .waybill-page__tab[disabled] {
@@ -398,6 +401,7 @@ function navigate(item: Waybill) {
   min-height: 0;
   height: auto;
   flex: 1;
+  overscroll-behavior: contain;
 }
 
 .waybill-page__list-loading {
@@ -405,7 +409,7 @@ function navigate(item: Waybill) {
   margin: 18rpx 28rpx 0;
   border-radius: 16rpx;
   color: var(--tms-primary);
-  background: #fff;
+  background: var(--tms-material-regular);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -420,10 +424,10 @@ function navigate(item: Waybill) {
   min-height: 76rpx;
   margin: 18rpx 28rpx 0;
   padding: 12rpx 16rpx 12rpx 22rpx;
-  border: 1rpx solid #fed7aa;
+  border: 1rpx solid rgba(234, 138, 20, 0.28);
   border-radius: 16rpx;
-  color: #9a5a0d;
-  background: #fff8ed;
+  color: var(--tms-orange-strong);
+  background: var(--tms-orange-soft);
   display: flex;
   align-items: center;
   gap: 12rpx;
@@ -444,7 +448,7 @@ function navigate(item: Waybill) {
   margin: 0;
   padding: 0 12rpx;
   border-radius: 12rpx;
-  color: #9a5a0d;
+  color: var(--tms-orange-strong);
   background: #ffedd5;
   font-size: max(23rpx, 12px);
   font-weight: 700;
@@ -469,7 +473,7 @@ function navigate(item: Waybill) {
 
 .waybill-page__list-head {
   padding: 2rpx 4rpx 4rpx;
-  color: #748096;
+  color: var(--tms-text-secondary);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -488,7 +492,7 @@ function navigate(item: Waybill) {
 }
 
 .waybill-page__list-head > view text:first-child {
-  color: #172033;
+  color: var(--tms-text-strong);
   font-size: max(27rpx, 12px);
   font-weight: 700;
 }
@@ -497,7 +501,7 @@ function navigate(item: Waybill) {
   min-height: 88rpx;
   margin-top: 20rpx;
   padding-top: 18rpx;
-  border-top: 1rpx solid #edf0f5;
+  border-top: 1rpx solid var(--tms-line-subtle);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -518,14 +522,14 @@ function navigate(item: Waybill) {
 }
 
 .waybill-expense-action > view text {
-  color: #344054;
+  color: var(--tms-text);
   font-size: max(22rpx, 12px);
   font-weight: 700;
 }
 
 .waybill-expense-action > view small {
   margin-top: 3rpx;
-  color: #98a2b3;
+  color: var(--tms-light);
   font-size: max(19rpx, 12px);
 }
 
@@ -547,9 +551,9 @@ function navigate(item: Waybill) {
   line-height: 1;
   touch-action: manipulation;
   transition:
-    color 160ms ease,
-    background-color 160ms ease,
-    transform 160ms ease;
+    color var(--tms-apple-duration-fast) var(--tms-apple-ease),
+    background-color var(--tms-apple-duration-fast) var(--tms-apple-ease),
+    transform var(--tms-apple-duration-fast) var(--tms-apple-ease);
 }
 
 .waybill-expense-action button::after {
@@ -572,7 +576,7 @@ function navigate(item: Waybill) {
   margin: 48rpx 28rpx;
   min-height: 360rpx;
   padding: 44rpx 36rpx;
-  color: #748096;
+  color: var(--tms-text-secondary);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -594,14 +598,14 @@ function navigate(item: Waybill) {
 }
 
 .waybill-page__empty-title {
-  color: #172033;
+  color: var(--tms-text-strong);
   font-size: 29rpx;
   font-weight: 700;
 }
 
 .waybill-page__empty-hint {
   padding: 0 38rpx;
-  color: #9aa5b7;
+  color: var(--tms-light);
   font-size: max(24rpx, 12px);
   line-height: 1.5;
 }

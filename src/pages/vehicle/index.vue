@@ -42,7 +42,13 @@ const vehicleStatusLabel = computed(() =>
   dictionary.label('vehicleOperationStatus', vehicle.value?.operationStatus)
 )
 const auditStatusLabel = computed(() =>
-  dictionary.label('vehicleAuditStatus', vehicle.value?.auditStatus)
+  dictionary.findLabel('vehicleAuditStatus', vehicle.value?.auditStatus) ||
+  ({
+    approved: '已通过',
+    pending: '审核中',
+    rejected: '未通过'
+  } as Record<string, string>)[vehicle.value?.auditStatus || ''] ||
+  '待审核'
 )
 
 onShow(() => {
@@ -206,10 +212,10 @@ function preview(url?: string) {
 .vehicle-page__sync-error {
   min-width: 0;
   padding: 16rpx 20rpx;
-  border: 1rpx solid #f4d8b0;
+  border: 1rpx solid rgba(234, 138, 20, 0.28);
   border-radius: var(--tms-radius-md);
-  color: #925a13;
-  background: #fff9ed;
+  color: var(--tms-orange-strong);
+  background: var(--tms-orange-soft);
   display: flex;
   align-items: center;
   justify-content: space-between;

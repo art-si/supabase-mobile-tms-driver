@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/profile'
@@ -19,7 +19,7 @@ const accountError = ref('')
 const passwordError = ref('')
 const loginError = ref('')
 const focusField = ref<'account' | 'password' | ''>('')
-const inputStyle = 'width: 100%; height: 100%; --wot-input-padding: 0 24rpx; --wot-input-bg: transparent; --wot-input-inner-height: 88rpx; --wot-input-inner-font-size: 28rpx; --wot-input-inner-color: #172033; --wot-input-inner-placeholder-color: #9aa5b7;'
+const inputStyle = 'width: 100%; height: 100%; --wot-input-padding: 0 24rpx; --wot-input-bg: transparent; --wot-input-inner-height: 88rpx; --wot-input-inner-font-size: 28rpx; --wot-input-inner-color: #172033; --wot-input-inner-placeholder-color: #98a3b5;'
 const accountValue = computed(() => account.value.trim())
 
 watch(account, () => {
@@ -38,6 +38,16 @@ onLoad(() => {
   if (auth.isLoggedIn) {
     uni.reLaunch({ url: '/pages/home/index' })
   }
+})
+
+onMounted(() => {
+  // #ifdef H5
+  const inputs = document.querySelectorAll<HTMLInputElement>('.login-form input')
+  inputs[0]?.setAttribute('autocomplete', 'username')
+  inputs[0]?.setAttribute('name', 'username')
+  inputs[1]?.setAttribute('autocomplete', 'current-password')
+  inputs[1]?.setAttribute('name', 'password')
+  // #endif
 })
 
 async function submit() {
@@ -129,7 +139,7 @@ function forgotPassword() {
       </view>
     </view>
 
-    <view class="login-form">
+    <view class="login-form" role="form" aria-label="司机账号登录">
       <view class="login-form__head">
         <view>
           <text class="login-form__title">账号登录</text>
@@ -148,7 +158,8 @@ function forgotPassword() {
             :error="Boolean(accountError)"
             :focus="focusField === 'account'"
             placeholder="请输入手机号/邮箱"
-            placeholder-style="color: #9aa5b7"
+            placeholder-style="color: #98a3b5"
+            autocomplete="username"
             type="text"
             confirm-type="next"
             clearable
@@ -173,7 +184,8 @@ function forgotPassword() {
             :error="Boolean(passwordError)"
             :focus="focusField === 'password'"
             placeholder="请输入登录密码"
-            placeholder-style="color: #9aa5b7"
+            placeholder-style="color: #98a3b5"
+            autocomplete="current-password"
             show-password
             confirm-type="done"
             no-border
@@ -187,7 +199,7 @@ function forgotPassword() {
         </view>
         <text v-if="passwordError" class="login-form__error" role="alert">{{ passwordError }}</text>
       </view>
-      <text v-if="loginError" class="login-form__error login-form__error--server" role="alert">{{ loginError }}</text>
+      <text v-if="loginError" class="login-form__error login-form__error--server" role="alert" aria-live="polite">{{ loginError }}</text>
 
       <view class="login-form__options">
         <view class="login-form__remember">
@@ -218,6 +230,7 @@ function forgotPassword() {
           :round="false"
           :loading="loading"
           :disabled="loading"
+          :aria-busy="loading"
           @click="submit"
         >
           登录
@@ -255,11 +268,12 @@ function forgotPassword() {
 .login-page {
   position: relative;
   min-height: 100vh;
+  min-height: 100dvh;
   padding: calc(70rpx + env(safe-area-inset-top)) 34rpx calc(32rpx + env(safe-area-inset-bottom));
   overflow-x: hidden;
   background:
     radial-gradient(circle at 92% 2%, rgba(var(--tms-primary-rgb), 0.12), transparent 360rpx),
-    linear-gradient(180deg, var(--tms-primary-soft) 0%, #ffffff 54%, #f8fafc 100%);
+    linear-gradient(180deg, var(--tms-primary-soft) 0%, var(--tms-bg) 52%, var(--tms-bg) 100%);
   display: flex;
   flex-direction: column;
 }
@@ -295,7 +309,7 @@ function forgotPassword() {
   position: absolute;
   inset: 0 0 auto;
   height: 620rpx;
-  opacity: 0.22;
+  opacity: 0.08;
   background-image:
     linear-gradient(rgba(var(--tms-primary-rgb), 0.08) 1rpx, transparent 1rpx),
     linear-gradient(90deg, rgba(var(--tms-primary-rgb), 0.08) 1rpx, transparent 1rpx);
@@ -408,18 +422,19 @@ function forgotPassword() {
 .login-page__title {
   display: block;
   margin-top: 18rpx;
-  color: #172033;
+  color: var(--tms-text-strong);
   font-size: 46rpx;
   font-weight: 700;
   line-height: 1.18;
-  letter-spacing: -1rpx;
+  letter-spacing: -1.2rpx;
+  font-optical-sizing: auto;
 }
 
 .login-page__description {
   display: block;
   max-width: 590rpx;
   margin-top: 18rpx;
-  color: #748096;
+  color: var(--tms-text-secondary);
   font-size: max(25rpx, 12px);
   font-weight: 500;
   line-height: 1.65;
@@ -430,7 +445,7 @@ function forgotPassword() {
   display: flex;
   align-items: center;
   gap: 28rpx;
-  color: #4b5870;
+  color: var(--tms-muted);
   font-size: max(21rpx, 12px);
   font-weight: 600;
 }
@@ -450,13 +465,14 @@ function forgotPassword() {
 }
 
 .login-form {
-  margin-top: 62rpx;
+  margin-top: 54rpx;
   padding: 32rpx;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1rpx solid #e7ebf2;
-  border-radius: 28rpx;
-  box-shadow: 0 24rpx 64rpx rgba(34, 39, 91, 0.14);
-  backdrop-filter: blur(24rpx);
+  background: var(--tms-material-regular);
+  border: 1rpx solid rgba(255, 255, 255, 0.76);
+  border-radius: 30rpx;
+  box-shadow: var(--tms-shadow-floating);
+  backdrop-filter: blur(26rpx) saturate(145%);
+  -webkit-backdrop-filter: blur(26rpx) saturate(145%);
 }
 
 .login-form__head {
@@ -473,22 +489,22 @@ function forgotPassword() {
 }
 
 .login-form__title {
-  color: #172033;
+  color: var(--tms-text-strong);
   font-size: 30rpx;
   font-weight: 700;
 }
 
 .login-form__hint {
   margin-top: 8rpx;
-  color: #748096;
+  color: var(--tms-text-secondary);
   font-size: max(21rpx, 12px);
 }
 
 .login-form__secure {
   padding: 8rpx 14rpx;
   border-radius: 999rpx;
-  color: #059669;
-  background: #ecfdf5;
+  color: var(--tms-green-strong);
+  background: var(--tms-green-soft);
   font-size: max(20rpx, 12px);
   font-weight: 700;
 }
@@ -496,10 +512,14 @@ function forgotPassword() {
 .login-form__field {
   height: 98rpx;
   min-height: 44px;
-  border: 1rpx solid #e8ecf3;
-  border-radius: 16rpx;
-  background: linear-gradient(145deg, #f8fafc, #f5f7fb);
+  border: 1rpx solid var(--tms-line);
+  border-radius: 18rpx;
+  background: rgba(118, 118, 128, 0.08);
   overflow: hidden;
+  transition:
+    border-color var(--tms-apple-duration-fast) var(--tms-apple-ease),
+    box-shadow var(--tms-apple-duration-fast) var(--tms-apple-ease),
+    background-color var(--tms-apple-duration-fast) var(--tms-apple-ease);
 }
 
 .login-form__control + .login-form__control {
@@ -509,7 +529,7 @@ function forgotPassword() {
 .login-form__label {
   display: block;
   margin-bottom: 10rpx;
-  color: #344054;
+  color: var(--tms-text-secondary);
   font-size: max(25rpx, 14px);
   font-weight: 600;
 }
@@ -521,7 +541,8 @@ function forgotPassword() {
 .login-form__field--focused,
 .login-form__field:focus-within {
   border-color: var(--tms-primary);
-  box-shadow: 0 0 0 3px rgba(var(--tms-primary-rgb), 0.13);
+  background: rgba(var(--tms-primary-rgb), 0.045);
+  box-shadow: 0 0 0 4rpx rgba(var(--tms-primary-rgb), 0.12);
 }
 
 .login-form__control--error .login-form__field--focused,
@@ -533,7 +554,7 @@ function forgotPassword() {
 .login-form__error {
   display: block;
   margin-top: 8rpx;
-  color: #b42328;
+  color: var(--tms-red-strong);
   font-size: max(22rpx, 12px);
   line-height: 1.4;
 }
@@ -548,7 +569,7 @@ function forgotPassword() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  color: #172033;
+  color: var(--tms-text-strong);
   font-size: max(26rpx, 12px);
 }
 
@@ -567,7 +588,7 @@ function forgotPassword() {
 }
 
 .login-form__remember :deep(.wd-checkbox__label) {
-  color: #172033;
+  color: var(--tms-text-strong);
   font-size: max(23rpx, 12px);
 }
 
@@ -584,6 +605,11 @@ function forgotPassword() {
   font-size: max(23rpx, 12px);
   font-weight: 700;
   line-height: 1;
+  touch-action: manipulation;
+  transition:
+    color var(--tms-apple-duration-fast) var(--tms-apple-ease),
+    background-color var(--tms-apple-duration-fast) var(--tms-apple-ease),
+    transform var(--tms-apple-duration-fast) var(--tms-apple-ease);
 }
 
 .login-form__link::after {
@@ -593,6 +619,7 @@ function forgotPassword() {
 .login-form__link--pressed {
   color: var(--tms-primary-deep);
   background: rgba(var(--tms-primary-rgb), 0.06);
+  transform: scale(0.98);
 }
 
 .login-form__button {
@@ -626,7 +653,7 @@ function forgotPassword() {
   align-items: center;
   justify-content: center;
   gap: 10rpx;
-  color: #748096;
+  color: var(--tms-text-secondary);
   font-size: max(24rpx, 12px);
   line-height: 1.2;
 }
@@ -636,8 +663,8 @@ function forgotPassword() {
   height: 74rpx;
   border-radius: 50%;
   color: #fff;
-  background: linear-gradient(135deg, #fb923c, #f59e0b);
-  box-shadow: 0 12rpx 24rpx rgba(245, 158, 11, 0.22);
+  background: var(--tms-primary);
+  box-shadow: var(--tms-shadow-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -646,10 +673,18 @@ function forgotPassword() {
 .login-page__agreement {
   margin-top: auto;
   padding-top: 30rpx;
-  color: #9aa5b7;
+  color: var(--tms-light);
   font-size: max(20rpx, 12px);
   line-height: 1.6;
   text-align: center;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .login-form {
+    background: var(--tms-surface);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }
 
 </style>

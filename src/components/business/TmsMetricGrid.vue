@@ -35,9 +35,9 @@ defineProps<{
   min-height: 136rpx;
   padding: 22rpx 14rpx;
   overflow: hidden;
-  border: 1rpx solid #e5eaf2;
+  border: 1rpx solid var(--tms-line);
   border-radius: 20rpx;
-  background: linear-gradient(150deg, #ffffff 0%, var(--tms-primary-soft) 100%);
+  background: linear-gradient(150deg, var(--tms-surface) 0%, var(--tms-primary-soft) 100%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -60,7 +60,7 @@ defineProps<{
 .metric-grid__label {
   min-width: 0;
   max-width: 100%;
-  color: #6c7890;
+  color: var(--tms-muted);
   font-size: max(24rpx, 12px);
   font-weight: 600;
   line-height: 1.2;
@@ -69,7 +69,7 @@ defineProps<{
 }
 
 .metric-grid__value {
-  color: #172033;
+  color: var(--tms-text-strong);
   min-width: 0;
   max-width: 100%;
   overflow: hidden;

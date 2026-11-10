@@ -53,22 +53,22 @@ const label = computed(
 }
 
 .status-tag--green {
-  color: #059669;
-  background: #ecfdf5;
+  color: var(--tms-green-strong);
+  background: var(--tms-green-soft);
 }
 
 .status-tag--orange {
-  color: #d97706;
-  background: #fffbeb;
+  color: var(--tms-orange-strong);
+  background: var(--tms-orange-soft);
 }
 
 .status-tag--red {
-  color: #dc2626;
-  background: #fef2f2;
+  color: var(--tms-red-strong);
+  background: var(--tms-red-soft);
 }
 
 .status-tag--gray {
-  color: #748096;
-  background: #f7f9fc;
+  color: var(--tms-text-secondary);
+  background: var(--tms-surface-muted);
 }
 </style>

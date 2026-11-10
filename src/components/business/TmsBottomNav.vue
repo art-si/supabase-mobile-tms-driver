@@ -28,7 +28,7 @@ function go(value: string | number) {
       :model-value="props.active"
       custom-class="bottom-nav__bar"
       active-color="var(--tms-primary)"
-      inactive-color="#929daf"
+      inactive-color="var(--tms-disabled)"
       role="navigation"
       aria-label="主导航"
       @change="go($event.value)"
@@ -67,12 +67,13 @@ function go(value: string | number) {
   height: 132rpx;
   padding: 12rpx 18rpx;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1rpx solid rgba(224, 230, 240, 0.9);
+  background: var(--tms-material-thin);
+  border: 1rpx solid rgba(255, 255, 255, 0.7);
   border-radius: 32rpx;
   backdrop-filter: blur(28rpx) saturate(150%);
+  -webkit-backdrop-filter: blur(28rpx) saturate(150%);
   display: block;
-  box-shadow: 0 16rpx 42rpx rgba(29, 39, 66, 0.13), 0 2rpx 0 rgba(255, 255, 255, 0.9) inset;
+  box-shadow: var(--tms-shadow-floating), 0 2rpx 0 rgba(255, 255, 255, 0.9) inset;
 }
 
 :deep(.bottom-nav__bar) {
@@ -93,7 +94,7 @@ function go(value: string | number) {
   background: transparent;
   min-width: 0;
   min-height: 44px;
-  color: #929daf;
+  color: var(--tms-disabled);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -102,6 +103,10 @@ function go(value: string | number) {
   font-size: max(24rpx, 12px);
   font-weight: 600;
   line-height: 1.1;
+  touch-action: manipulation;
+  transition:
+    color var(--tms-apple-duration-fast) var(--tms-apple-ease),
+    background-color var(--tms-apple-duration-fast) var(--tms-apple-ease);
 }
 
 :deep(.bottom-nav__item)::after {
@@ -152,7 +157,7 @@ function go(value: string | number) {
 }
 
 .bottom-nav__label {
-  color: #929daf;
+  color: var(--tms-disabled);
 }
 
 .bottom-nav__icon-box--active,
@@ -177,6 +182,13 @@ function go(value: string | number) {
 :deep(.bottom-nav__item):focus-visible {
   outline: 4rpx solid rgba(var(--tms-primary-rgb), 0.36);
   outline-offset: -4rpx;
+}
+
+@media (hover: hover) {
+  :deep(.bottom-nav__item:hover) {
+    color: var(--tms-primary);
+    background: rgba(var(--tms-primary-rgb), 0.05);
+  }
 }
 
 @media screen and (min-width: 520px) {

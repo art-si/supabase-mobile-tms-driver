@@ -530,8 +530,8 @@ function showError(error: unknown, fallback: string) {
               }}</strong>
             </view>
             <view>
-              <text>距中心</text>
-              <strong>{{ Math.round(context.operation.distanceM) }} 米</strong>
+              <text>{{ context.geofenceEnabled ? '距中心' : '定位用途' }}</text>
+              <strong>{{ context.geofenceEnabled ? `${Math.round(context.operation.distanceM)} 米` : '仅留痕' }}</strong>
             </view>
             <view>
               <text>定位精度</text>
@@ -590,6 +590,7 @@ function showError(error: unknown, fallback: string) {
                 type="digit"
                 inputmode="decimal"
                 compact
+                aria-label="净重，单位吨"
                 :disabled="!context.operation"
                 :readonly="isCompleted"
                 :placeholder="`请输入${title}净重`"
@@ -610,6 +611,7 @@ function showError(error: unknown, fallback: string) {
                   type="digit"
                   inputmode="decimal"
                   compact
+                  aria-label="毛重，单位吨"
                   :disabled="!context.operation"
                   :readonly="isCompleted"
                   placeholder="选填"
@@ -625,6 +627,7 @@ function showError(error: unknown, fallback: string) {
                   type="digit"
                   inputmode="decimal"
                   compact
+                  aria-label="皮重，单位吨"
                   :disabled="!context.operation"
                   :readonly="isCompleted"
                   placeholder="选填"
@@ -812,6 +815,7 @@ function showError(error: unknown, fallback: string) {
             <wd-textarea
               v-model="form.remark"
               custom-class="tms-form-textarea"
+              aria-label="装卸货备注"
               :disabled="!context.operation"
               :readonly="isCompleted"
               :maxlength="300"

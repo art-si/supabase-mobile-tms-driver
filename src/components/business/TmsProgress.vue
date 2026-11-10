@@ -10,10 +10,18 @@ const props = defineProps<{
 
 const steps = ['接单', '装货', '运输中', '卸货', '签收', '完成']
 const currentStep = computed(() => getStatusStep(props.status))
+const currentLabel = computed(() => steps[currentStep.value] || steps[0])
 </script>
 
 <template>
-  <view class="progress">
+  <view
+    class="progress"
+    role="progressbar"
+    :aria-valuemin="0"
+    :aria-valuemax="steps.length - 1"
+    :aria-valuenow="currentStep"
+    :aria-label="`运输进度：${currentLabel}`"
+  >
     <view class="progress__labels">
       <text
         v-for="(item, index) in steps"
@@ -59,7 +67,7 @@ const currentStep = computed(() => getStatusStep(props.status))
 }
 
 .progress__label {
-  color: #748096;
+  color: var(--tms-text-secondary);
   font-size: max(22rpx, 12px);
   text-align: center;
   line-height: 1.2;
@@ -88,7 +96,7 @@ const currentStep = computed(() => getStatusStep(props.status))
   height: 8rpx;
   margin: 0 14rpx;
   border-radius: 8rpx;
-  background: #eef1f7;
+  background: var(--tms-surface-muted);
 }
 
 .progress__bar {
@@ -106,7 +114,7 @@ const currentStep = computed(() => getStatusStep(props.status))
   border: 4rpx solid #fff;
   border-radius: 50%;
   background: #cfd7e6;
-  box-shadow: 0 0 0 2rpx #dce3ee;
+  box-shadow: 0 0 0 2rpx var(--tms-line);
   transform: translate(-50%, -50%);
   display: flex;
   align-items: center;
@@ -151,7 +159,7 @@ const currentStep = computed(() => getStatusStep(props.status))
   height: 26rpx;
   border: 6rpx solid #fff;
   background: var(--tms-primary);
-  box-shadow: 0 0 0 4rpx rgba(55, 99, 244, 0.24);
+  box-shadow: 0 0 0 4rpx rgba(var(--tms-primary-rgb), 0.24);
 }
 
 </style>

@@ -488,7 +488,7 @@ function handleTaskAction() {
 
 .home-page__content {
   position: relative;
-  padding: 0 28rpx 64rpx;
+  padding: 8rpx 28rpx 64rpx;
 }
 
 .vehicle-card,
@@ -496,6 +496,13 @@ function handleTaskAction() {
   padding: 30rpx;
   border-radius: 28rpx;
   box-shadow: var(--tms-shadow-md);
+}
+
+.task-card :deep(.route-card--task) {
+  border-color: rgba(var(--tms-primary-rgb), 0.14);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(var(--tms-primary-rgb), 0.025)),
+    var(--tms-surface);
 }
 
 .vehicle-card__title-row {

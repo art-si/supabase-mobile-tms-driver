@@ -113,7 +113,9 @@ function confirm() {
 
 <style scoped lang="scss">
 .datetime-sheet {
-  background: #fff;
+  background: var(--tms-surface);
+  backdrop-filter: blur(22rpx) saturate(140%);
+  -webkit-backdrop-filter: blur(22rpx) saturate(140%);
 }
 .datetime-sheet__header {
   min-height: 104rpx;
@@ -121,7 +123,7 @@ function confirm() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1rpx solid var(--tms-line);
+  border-bottom: 1rpx solid var(--tms-line-subtle);
 }
 .datetime-sheet__title {
   color: var(--tms-text);

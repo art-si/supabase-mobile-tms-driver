@@ -117,6 +117,11 @@ function selectTheme(preset: ThemePresetId) {
   gap: 18rpx;
   text-align: left;
   line-height: 1.25;
+  touch-action: manipulation;
+  transition:
+    border-color var(--tms-apple-duration-fast) var(--tms-apple-ease),
+    background-color var(--tms-apple-duration-fast) var(--tms-apple-ease),
+    transform var(--tms-apple-duration-fast) var(--tms-apple-ease);
 }
 
 .theme-option::after {
@@ -127,6 +132,10 @@ function selectTheme(preset: ThemePresetId) {
 .theme-option:active {
   border-color: var(--tms-primary);
   background: var(--tms-primary-soft);
+}
+
+.theme-option:active {
+  transform: scale(0.99);
 }
 
 .theme-option:focus-visible {

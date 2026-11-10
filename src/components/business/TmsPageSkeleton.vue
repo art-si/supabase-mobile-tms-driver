@@ -17,7 +17,12 @@ defineEmits<{
 </script>
 
 <template>
-  <view class="page-skeleton" :class="{ 'page-skeleton--compact': compact }">
+    <view
+      class="page-skeleton"
+      :class="{ 'page-skeleton--compact': compact }"
+      :role="error ? 'alert' : 'status'"
+      :aria-live="error ? 'assertive' : 'polite'"
+    >
     <view v-if="error" class="page-skeleton__error">
       <view class="page-skeleton__error-icon">!</view>
       <text class="page-skeleton__error-title">页面加载失败</text>
@@ -59,10 +64,12 @@ defineEmits<{
 .page-skeleton__error {
   min-height: 480rpx;
   padding: 72rpx 44rpx;
-  border: 1rpx solid #e6eaf2;
+  border: 1rpx solid var(--tms-line);
   border-radius: 24rpx;
-  background: #fff;
-  box-shadow: 0 12rpx 34rpx rgba(30, 41, 66, 0.06);
+  background: var(--tms-material-regular);
+  box-shadow: var(--tms-shadow-sm);
+  backdrop-filter: blur(18rpx) saturate(140%);
+  -webkit-backdrop-filter: blur(18rpx) saturate(140%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -110,8 +117,8 @@ defineEmits<{
   border: 0;
   border-radius: var(--tms-control-radius);
   color: #fff;
-  background: linear-gradient(135deg, var(--tms-primary), var(--tms-primary-bright));
-  box-shadow: 0 12rpx 24rpx rgba(var(--tms-primary-rgb), 0.22);
+  background: var(--tms-primary);
+  box-shadow: var(--tms-shadow-primary);
   font-size: var(--tms-control-font-size);
   font-weight: 700;
   line-height: var(--tms-control-height);
@@ -137,10 +144,12 @@ defineEmits<{
 
 .page-skeleton__card {
   padding: 28rpx;
-  background: #fff;
-  border: 1rpx solid rgba(226, 231, 242, 0.9);
+  background: var(--tms-material-regular);
+  border: 1rpx solid var(--tms-line);
   border-radius: 24rpx;
-  box-shadow: 0 12rpx 32rpx rgba(43, 55, 84, 0.05);
+  box-shadow: var(--tms-shadow-sm);
+  backdrop-filter: blur(18rpx) saturate(140%);
+  -webkit-backdrop-filter: blur(18rpx) saturate(140%);
 }
 
 .page-skeleton__card + .page-skeleton__card {
@@ -157,7 +166,7 @@ defineEmits<{
   width: 66rpx;
   height: 66rpx;
   border-radius: 50%;
-  background: #edf1f8;
+  background: var(--tms-surface-muted);
 }
 
 .page-skeleton__lines {
@@ -170,7 +179,7 @@ defineEmits<{
 .page-skeleton__uploads view,
 .page-skeleton__circle {
   overflow: hidden;
-  background: linear-gradient(100deg, #eef1f6 30%, #f8f9fc 50%, #eef1f6 70%);
+  background: linear-gradient(100deg, var(--tms-surface-muted) 30%, var(--tms-surface-soft) 50%, var(--tms-surface-muted) 70%);
   background-size: 240% 100%;
   animation: skeleton-shimmer 1.35s ease-in-out infinite;
 }

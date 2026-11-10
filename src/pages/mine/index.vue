@@ -497,7 +497,7 @@ async function confirmLogout() {
 .section-title {
   display: block;
   margin-top: 7rpx;
-  color: #172033;
+  color: var(--tms-text-strong);
   font-size: 31rpx;
   font-weight: 700;
 }
@@ -510,7 +510,7 @@ async function confirmLogout() {
 }
 
 .section-head__hint {
-  color: #748096;
+  color: var(--tms-text-secondary);
   font-size: max(21rpx, 12px);
 }
 
@@ -520,8 +520,8 @@ async function confirmLogout() {
 
 .account-list__row {
   min-height: 80rpx;
-  border-bottom: 1rpx solid #e8ecf3;
-  color: #172033;
+  border-bottom: 1rpx solid var(--tms-line-subtle);
+  color: var(--tms-text-strong);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -622,14 +622,15 @@ async function confirmLogout() {
   border: 0;
   background: transparent;
   min-width: 0;
-  color: #748096;
+  color: var(--tms-text-secondary);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 14rpx;
   font-size: max(22rpx, 12px);
   font-weight: 600;
-  transition: transform 160ms ease;
+  touch-action: manipulation;
+  transition: transform var(--tms-apple-duration-fast) var(--tms-apple-ease);
 }
 
 .feature-grid :deep(.feature-grid__item .wd-button__content),
@@ -654,20 +655,20 @@ async function confirmLogout() {
   height: 86rpx;
   border-radius: 24rpx;
   color: var(--tms-primary);
-  background: #f7f9fc;
+  background: var(--tms-surface-muted);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .feature-grid__item:nth-child(2) .feature-grid__icon {
-  color: #059669;
-  background: #ecfdf5;
+  color: var(--tms-green-strong);
+  background: var(--tms-green-soft);
 }
 
 .feature-grid__item:nth-child(3) .feature-grid__icon {
-  color: #d97706;
-  background: #fffbeb;
+  color: var(--tms-orange-strong);
+  background: var(--tms-orange-soft);
 }
 
 .feature-grid__item:nth-child(4) .feature-grid__icon {
@@ -682,8 +683,8 @@ async function confirmLogout() {
   padding: 0;
   border: 1rpx solid rgba(239, 68, 68, 0.2);
   border-radius: var(--tms-control-radius);
-  color: #dc2626;
-  background: #fef2f2;
+  color: var(--tms-red-strong);
+  background: var(--tms-red-soft);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -704,8 +705,10 @@ async function confirmLogout() {
   width: 100%;
   padding: 32rpx 32rpx calc(34rpx + env(safe-area-inset-bottom));
   border-radius: 32rpx 32rpx 0 0;
-  background: #fff;
-  box-shadow: 0 -20rpx 60rpx rgba(17, 24, 39, 0.16);
+  background: var(--tms-material-regular);
+  box-shadow: 0 -20rpx 60rpx rgba(15, 23, 42, 0.14);
+  backdrop-filter: blur(22rpx) saturate(140%);
+  -webkit-backdrop-filter: blur(22rpx) saturate(140%);
 }
 
 .mine-help__head {
@@ -742,8 +745,8 @@ async function confirmLogout() {
   gap: 18rpx;
   padding: 18rpx;
   border-radius: 18rpx;
-  background: #f6f8fc;
-  color: #475569;
+  background: var(--tms-surface-muted);
+  color: var(--tms-muted);
   font-size: max(24rpx, 12px);
   line-height: 1.5;
 }
@@ -776,7 +779,7 @@ async function confirmLogout() {
   display: flex;
   flex-direction: column;
   gap: 24rpx;
-  background: #fff;
+  background: var(--tms-surface);
 }
 
 .mine-dialog__title {

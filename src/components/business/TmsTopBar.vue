@@ -159,11 +159,17 @@ function back() {
   color: #fff;
   background: rgba(255, 255, 255, 0.13);
   backdrop-filter: blur(16rpx);
+  -webkit-backdrop-filter: blur(16rpx);
   border: 1rpx solid rgba(255, 255, 255, 0.18);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
+  touch-action: manipulation;
+  transition:
+    transform var(--tms-apple-duration-fast) var(--tms-apple-ease),
+    background-color var(--tms-apple-duration-standard) var(--tms-apple-ease),
+    border-color var(--tms-apple-duration-standard) var(--tms-apple-ease);
 }
 
 .top-bar__icon::after {
@@ -174,8 +180,20 @@ function back() {
   background: rgba(255, 255, 255, 0.22);
 }
 
+.top-bar__icon:active {
+  transform: scale(0.95);
+}
+
 .top-bar__icon:focus-visible {
   outline: 4rpx solid rgba(255, 255, 255, 0.84);
   outline-offset: 3rpx;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .top-bar__icon {
+    background: rgba(255, 255, 255, 0.28);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }
 </style>

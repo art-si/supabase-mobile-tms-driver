@@ -244,7 +244,7 @@ const traceDescription = computed(() => {
 
 .trajectory-panel__title {
   margin-top: 7rpx;
-  color: #172033;
+  color: var(--tms-text-strong);
   font-size: 30rpx;
   font-weight: 700;
 }
@@ -269,8 +269,8 @@ const traceDescription = computed(() => {
   min-width: 0;
   padding: 17rpx 12rpx;
   text-align: center;
-  border: 1rpx solid #edf0f5;
-  background: linear-gradient(180deg, #fafbfe 0%, #f5f7fb 100%);
+  border: 1rpx solid var(--tms-line-subtle);
+  background: linear-gradient(180deg, var(--tms-surface-soft) 0%, var(--tms-surface-muted) 100%);
   border-radius: 14rpx;
 }
 
@@ -280,14 +280,14 @@ const traceDescription = computed(() => {
 }
 
 .trajectory-panel__summary strong {
-  color: #172033;
+  color: var(--tms-text-strong);
   font-size: max(28rpx, 12px);
   font-weight: 700;
 }
 
 .trajectory-panel__summary text {
   margin-top: 4rpx;
-  color: #748096;
+  color: var(--tms-text-secondary);
   font-size: max(19rpx, 12px);
 }
 
@@ -295,7 +295,7 @@ const traceDescription = computed(() => {
   position: relative;
   margin-top: 20rpx;
   overflow: hidden;
-  border: 1rpx solid #dce3ed;
+  border: 1rpx solid var(--tms-line);
   border-radius: 20rpx;
   background: #e8eef5;
   box-shadow: 0 10rpx 28rpx rgba(31, 42, 68, 0.07);
@@ -308,7 +308,7 @@ const traceDescription = computed(() => {
   z-index: 4;
   gap: 14rpx;
   padding: 9rpx 13rpx;
-  color: #5f6b80;
+  color: var(--tms-muted);
   background: rgba(255, 255, 255, 0.94);
   border-radius: 999rpx;
   font-size: max(22rpx, 12px);
@@ -348,7 +348,7 @@ const traceDescription = computed(() => {
   gap: 10rpx;
   margin-top: 18rpx;
   padding: 16rpx 18rpx;
-  color: #52627a;
+  color: var(--tms-info);
   background: var(--tms-primary-soft);
   border-left: 5rpx solid var(--tms-primary);
   border-radius: 13rpx;
@@ -374,7 +374,7 @@ const traceDescription = computed(() => {
   left: 19rpx;
   width: 2rpx;
   content: "";
-  background: #dfe5f1;
+  background: var(--tms-line);
 }
 
 .trace-list__index {
@@ -401,7 +401,7 @@ const traceDescription = computed(() => {
 }
 
 .trace-list__index.is-inferred {
-  background: #f59e0b;
+  background: var(--tms-orange);
 }
 
 .trace-list__main {
@@ -412,14 +412,14 @@ const traceDescription = computed(() => {
 
 .trace-list__title-row strong {
   min-width: 0;
-  color: #1c2738;
+  color: var(--tms-text-strong);
   font-size: max(24rpx, 12px);
   overflow-wrap: anywhere;
 }
 
 .trace-list__title-row text {
   flex: 0 0 auto;
-  color: #66738a;
+  color: var(--tms-muted);
   font-size: max(19rpx, 12px);
 }
 
@@ -428,14 +428,14 @@ const traceDescription = computed(() => {
 .trace-list__coordinate {
   display: block;
   margin-top: 6rpx;
-  color: #6f7c91;
+  color: var(--tms-text-secondary);
   font-size: max(20rpx, 12px);
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
 
 .trace-list__coordinate {
-  color: #929bad;
+  color: var(--tms-light);
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   font-size: max(18rpx, 12px);
 }
@@ -446,12 +446,12 @@ const traceDescription = computed(() => {
   align-items: center;
   gap: 8rpx;
   padding: 54rpx 20rpx 26rpx;
-  color: #8994a7;
+  color: var(--tms-light);
   text-align: center;
 }
 
 .trajectory-panel__empty strong {
-  color: #435067;
+  color: var(--tms-muted);
   font-size: max(24rpx, 12px);
 }
 

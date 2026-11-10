@@ -317,6 +317,7 @@ function showError(error: unknown, fallback: string) {
                 type="digit"
                 inputmode="decimal"
                 compact
+                aria-label="仪表盘里程，单位公里"
                 placeholder="请输入仪表盘公里数"
               /><text>km</text></view
             >
@@ -378,6 +379,7 @@ function showError(error: unknown, fallback: string) {
             <wd-textarea
               v-model="form.remark"
               custom-class="tms-form-textarea"
+              :aria-label="`${isDeparture ? '发车' : '收车'}备注`"
               :maxlength="300"
               placeholder="可填写现场说明"
             />

@@ -438,8 +438,8 @@ function preview(item: TimelineItem, index: number) {
   margin-top: 22rpx;
   padding: 16rpx 18rpx;
   border-radius: 16rpx;
-  color: #315ea8;
-  background: #eef5ff;
+  color: var(--tms-info);
+  background: var(--tms-info-soft);
   display: flex;
   align-items: flex-start;
   gap: 10rpx;
@@ -457,8 +457,8 @@ function preview(item: TimelineItem, index: number) {
   margin-top: 12rpx;
   padding: 15rpx 18rpx;
   border-radius: 14rpx;
-  color: #9a5c0b;
-  background: #fff7e8;
+  color: var(--tms-orange-strong);
+  background: var(--tms-orange-soft);
   display: flex;
   align-items: flex-start;
   gap: 10rpx;
@@ -523,22 +523,22 @@ function preview(item: TimelineItem, index: number) {
 }
 
 .tracking-item--green .tracking-item__dot {
-  border-color: #d9f6eb;
+  border-color: var(--tms-green-soft);
   background: var(--tms-green);
 }
 
 .tracking-item--orange .tracking-item__dot {
-  border-color: #fff0d5;
+  border-color: var(--tms-orange-soft);
   background: var(--tms-orange);
 }
 
 .tracking-item--red .tracking-item__dot {
-  border-color: #fde3e5;
+  border-color: var(--tms-red-soft);
   background: var(--tms-red);
 }
 
 .tracking-item--gray .tracking-item__dot {
-  border-color: #edf0f5;
+  border-color: var(--tms-line-subtle);
   color: #fff;
   background: #8b97aa;
 }
@@ -547,7 +547,7 @@ function preview(item: TimelineItem, index: number) {
   width: 2rpx;
   min-height: 100%;
   flex: 1;
-  background: linear-gradient(#d8e0ed 0%, #e7ebf2 100%);
+  background: linear-gradient(#d8e0ed 0%, var(--tms-line) 100%);
 }
 
 .tracking-item__content {

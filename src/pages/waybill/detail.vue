@@ -799,7 +799,7 @@ function viewReceipt(current?: string) {
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
-  background: #f4f6fa;
+  background: var(--tms-bg);
   display: flex;
   flex-direction: column;
 }
@@ -882,7 +882,7 @@ function viewReceipt(current?: string) {
   min-height: var(--tms-control-height);
   margin: 0;
   padding: 0 14rpx;
-  color: #657188;
+  color: var(--tms-text-secondary);
   background: transparent;
   border-radius: 16rpx;
   font-size: max(24rpx, 12px);
@@ -941,7 +941,7 @@ function viewReceipt(current?: string) {
   height: 34rpx;
   padding: 0 8rpx;
   color: #fff;
-  background: #ef5350;
+  background: var(--tms-red);
   border-radius: 999rpx;
   font-size: max(18rpx, 12px);
   font-style: normal;
@@ -952,7 +952,7 @@ function viewReceipt(current?: string) {
 .section-title {
   display: block;
   margin-top: 7rpx;
-  color: #172033;
+  color: var(--tms-text-strong);
   font-size: 32rpx;
   font-weight: 700;
 }
@@ -960,7 +960,7 @@ function viewReceipt(current?: string) {
 .detail-actions {
   margin-top: 32rpx;
   padding-top: 26rpx;
-  border-top: 1rpx solid #edf0f5;
+  border-top: 1rpx solid var(--tms-line-subtle);
   display: flex;
   flex-direction: column;
   gap: 20rpx;
@@ -986,8 +986,8 @@ function viewReceipt(current?: string) {
 }
 
 .detail-actions__helper--success {
-  color: #047857;
-  background: #ecfdf5;
+  color: var(--tms-green-strong);
+  background: var(--tms-green-soft);
 }
 
 .detail-actions__controls {
@@ -1071,8 +1071,8 @@ function viewReceipt(current?: string) {
 
 .info-list__row {
   min-height: 70rpx;
-  border-bottom: 1rpx solid #e8ecf3;
-  color: #748096;
+  border-bottom: 1rpx solid var(--tms-line-subtle);
+  color: var(--tms-text-secondary);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1081,7 +1081,7 @@ function viewReceipt(current?: string) {
 }
 
 .info-list__row text:last-child {
-  color: #172033;
+  color: var(--tms-text-strong);
   font-weight: 700;
   text-align: right;
 }
@@ -1104,7 +1104,7 @@ function viewReceipt(current?: string) {
   align-items: center;
   gap: 16rpx;
   padding: 24rpx 0;
-  border-bottom: 1rpx solid #e8ecf3;
+  border-bottom: 1rpx solid var(--tms-line-subtle);
 }
 
 .station-list__row:last-child {
@@ -1113,14 +1113,14 @@ function viewReceipt(current?: string) {
 }
 
 .station-list__label {
-  color: #748096;
+  color: var(--tms-text-secondary);
   font-size: max(26rpx, 12px);
   line-height: 1.2;
 }
 
 .station-list__main {
   min-width: 0;
-  color: #172033;
+  color: var(--tms-text-strong);
   display: flex;
   flex-direction: column;
   gap: 8rpx;
@@ -1146,13 +1146,13 @@ function viewReceipt(current?: string) {
 }
 
 .station-list__phone {
-  color: #172033;
+  color: var(--tms-text-strong);
   font-weight: 700;
   line-height: 1.2;
 }
 
 .station-list__address {
-  color: #748096;
+  color: var(--tms-text-secondary);
   font-size: max(24rpx, 12px);
   font-weight: 600;
   line-height: 1.4;
@@ -1178,7 +1178,7 @@ function viewReceipt(current?: string) {
   overflow: hidden;
   border: 0;
   border-radius: 16rpx;
-  background: #f7f9fc;
+  background: var(--tms-surface-muted);
 }
 
 .proof-card__image image {
@@ -1191,7 +1191,7 @@ function viewReceipt(current?: string) {
   margin: 38rpx 28rpx;
   min-height: 360rpx;
   padding: 44rpx;
-  color: #748096;
+  color: var(--tms-text-secondary);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1213,14 +1213,14 @@ function viewReceipt(current?: string) {
 }
 
 .detail-page__state-title {
-  color: #172033;
+  color: var(--tms-text-strong);
   font-size: 29rpx;
   font-weight: 700;
 }
 
 .detail-page__state-hint {
   max-width: 470rpx;
-  color: #748096;
+  color: var(--tms-text-secondary);
   font-size: max(23rpx, 12px);
   line-height: 1.55;
 }
@@ -1232,7 +1232,7 @@ function viewReceipt(current?: string) {
   min-height: calc(128rpx + env(safe-area-inset-bottom));
   padding: 22rpx 30rpx calc(22rpx + env(safe-area-inset-bottom));
   background: rgba(255, 255, 255, 0.98);
-  border-top: 1rpx solid #e8ecf3;
+  border-top: 1rpx solid var(--tms-line-subtle);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1241,7 +1241,7 @@ function viewReceipt(current?: string) {
 }
 
 .pending-footer__label {
-  color: #172033;
+  color: var(--tms-text-strong);
   font-size: max(26rpx, 12px);
 }
 

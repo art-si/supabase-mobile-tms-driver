@@ -19,16 +19,36 @@ page,
   --wot-typography-label-font-family: var(--tms-font-family);
   --wot-font-weight-medium: 500;
   --wot-font-weight-semibold: 600;
-  --tms-bg: #f2f5fa;
-  --tms-panel: #f7f9fc;
+  --tms-bg: #f5f5f7;
+  --tms-panel: #fbfbfd;
   --tms-surface: #ffffff;
+  --tms-surface-raised: #ffffff;
+  --tms-surface-soft: #f8f8fa;
+  --tms-surface-muted: #f2f2f4;
+  --tms-material-thin: rgba(255, 255, 255, 0.68);
+  --tms-material-regular: rgba(255, 255, 255, 0.9);
   --tms-text: #152033;
+  --tms-text-strong: #172033;
+  --tms-text-secondary: #748096;
   --tms-muted: #66738a;
   --tms-light: #98a3b5;
-  --tms-line: #e4e9f1;
+  --tms-line: rgba(60, 60, 67, 0.16);
+  --tms-line-subtle: rgba(60, 60, 67, 0.1);
   --tms-green: #0f9f6e;
+  --tms-green-strong: #059669;
+  --tms-green-soft: #ecfdf5;
   --tms-orange: #ea8a14;
+  --tms-orange-strong: #d97706;
+  --tms-orange-soft: #fffbeb;
   --tms-red: #e5484d;
+  --tms-red-strong: #dc2626;
+  --tms-red-soft: #fef2f2;
+  --tms-info: #315ea8;
+  --tms-info-soft: #eef5ff;
+  --tms-disabled: #929daf;
+  --tms-apple-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --tms-apple-duration-fast: 120ms;
+  --tms-apple-duration-standard: 220ms;
   --tms-radius-sm: 14rpx;
   --tms-radius-md: 18rpx;
   --tms-radius-lg: 26rpx;
@@ -37,8 +57,9 @@ page,
   --tms-control-radius: 18rpx;
   --tms-control-font-size: max(28rpx, 12px);
   --tms-tabbar-space: calc(160rpx + env(safe-area-inset-bottom));
-  --tms-shadow-sm: 0 10rpx 30rpx rgba(28, 39, 65, 0.065);
-  --tms-shadow-md: 0 20rpx 54rpx rgba(31, 40, 74, 0.12);
+  --tms-shadow-sm: 0 8rpx 24rpx rgba(15, 23, 42, 0.06);
+  --tms-shadow-md: 0 18rpx 44rpx rgba(15, 23, 42, 0.1);
+  --tms-shadow-floating: 0 20rpx 48rpx rgba(15, 23, 42, 0.12);
 }
 
 .page {
@@ -56,10 +77,12 @@ page,
   position: relative;
   min-width: 0;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.98);
-  border: 1rpx solid rgba(220, 227, 238, 0.88);
+  background: var(--tms-material-regular);
+  border: 1rpx solid var(--tms-line);
   border-radius: var(--tms-radius-lg);
   box-shadow: var(--tms-shadow-sm);
+  backdrop-filter: blur(18rpx) saturate(140%);
+  -webkit-backdrop-filter: blur(18rpx) saturate(140%);
 }
 
 .section-title {
@@ -67,7 +90,9 @@ page,
   font-size: 30rpx;
   font-weight: 700;
   line-height: 1.25;
-  letter-spacing: -0.3rpx;
+  letter-spacing: -0.45rpx;
+  font-optical-sizing: auto;
+  text-wrap: balance;
 }
 
 .section-eyebrow {
@@ -89,6 +114,12 @@ page,
   font-size: var(--tms-control-font-size) !important;
   font-weight: 700 !important;
   line-height: 1 !important;
+  touch-action: manipulation;
+  transition:
+    transform var(--tms-apple-duration-fast) var(--tms-apple-ease),
+    box-shadow var(--tms-apple-duration-standard) var(--tms-apple-ease),
+    background-color var(--tms-apple-duration-standard) var(--tms-apple-ease),
+    border-color var(--tms-apple-duration-standard) var(--tms-apple-ease);
 }
 
 .tms-secondary-action::after,
@@ -99,7 +130,7 @@ page,
 .tms-primary-action {
   color: #fff !important;
   border: 0 !important;
-  background: var(--tms-primary-gradient) !important;
+  background: var(--tms-primary) !important;
   box-shadow: var(--tms-shadow-primary);
 }
 
@@ -122,6 +153,19 @@ page,
 .tms-danger-action.is-disabled {
   opacity: 0.62;
   box-shadow: none;
+}
+
+.tms-primary-action:active:not(.is-disabled),
+.tms-secondary-action:active:not(.is-disabled),
+.tms-danger-action:active:not(.is-disabled) {
+  transform: translateY(1rpx) scale(0.99);
+}
+
+.tms-primary-action:focus-visible,
+.tms-secondary-action:focus-visible,
+.tms-danger-action:focus-visible {
+  outline: 4rpx solid rgba(var(--tms-primary-rgb), 0.28);
+  outline-offset: 4rpx;
 }
 
 .tms-primary-action .wd-button__content,
@@ -173,6 +217,9 @@ page,
   background: #fff;
   display: flex;
   align-items: center;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .wd-cell.tms-select-trigger {
@@ -187,6 +234,17 @@ page,
   background: var(--tms-panel);
   display: flex;
   align-items: center;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.wd-cell.tms-date-trigger:focus-within,
+.wd-cell.tms-select-trigger:focus-within,
+.wd-input.tms-form-input:focus-within,
+.wd-textarea.tms-form-textarea:focus-within {
+  border-color: rgba(var(--tms-primary-rgb), 0.58);
+  box-shadow: 0 0 0 4rpx rgba(var(--tms-primary-rgb), 0.1);
 }
 
 .wd-cell.tms-select-trigger .wd-cell__wrapper,
