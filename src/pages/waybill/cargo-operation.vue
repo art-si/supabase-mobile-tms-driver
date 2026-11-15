@@ -4,7 +4,7 @@ import { onLoad } from "@dcloudio/uni-app";
 import { getUserFacingErrorMessage } from "@/api/supabase";
 import TmsTopBar from "@/components/business/TmsTopBar.vue";
 import TmsIcon from "@/components/business/TmsIcon.vue";
-import TmsPageSkeleton from "@/components/business/TmsPageSkeleton.vue";
+import TmsPageSkeleton from "@mobile-core/components/TmsPageSkeleton.vue";
 import { usePageTheme } from "@/composables/usePageTheme";
 import {
   analyzeCargoWeighbridgeTicket,

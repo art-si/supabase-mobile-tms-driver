@@ -1,4 +1,6 @@
 <div align="center">
+
+The app uses the shared design system in supabase-mobile-pro. Build it from the main repository’s modules directory, or use MOBILE_PRO_ROOT to locate the matching main repository checkout.
   <h1>Art Supabase TMS Driver</h1>
   <p><strong>A driver-facing H5 and WeChat Mini Program connected to the Art Supabase TMS execution lifecycle</strong></p>
   <p>

@@ -54,6 +54,8 @@ Art Supabase TMS 司机端是运输履约的一线移动工作台，基于 uni-a
 
 ## 快速开始
 
+开发和构建使用 [supabase-mobile-pro](https://gitee.com/art-si/supabase-mobile-pro) 的公共样式。可在主仓的 `modules/` 中开发。单独检出时，在同一级放好对应版本的主仓，或用 `MOBILE_PRO_ROOT` 指向主仓目录。
+
 建议使用 Node.js 22 与 pnpm。
 
 ```powershell

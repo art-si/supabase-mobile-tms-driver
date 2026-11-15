@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import TmsTopBar from '@/components/business/TmsTopBar.vue'
 import { usePageTheme } from '@/composables/usePageTheme'
-import { THEME_PRESETS, type ThemePresetId } from '@/stores/theme'
+import { THEME_PRESETS, type ThemePresetId } from '@mobile-core/theme'
 
 const { theme, themeName } = usePageTheme()
 

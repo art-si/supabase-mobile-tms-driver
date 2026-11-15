@@ -33,7 +33,9 @@ onShow(() => {
 </script>
 
 <style lang="scss">
-@use './styles/global.scss';
+@use '@mobile-core/styles/global.scss' as mobile;
+
+@include mobile.apply('tms', 'TMS Icons', '~@/static/icons/tms-icons.ttf');
 
 page {
   min-height: 100%;

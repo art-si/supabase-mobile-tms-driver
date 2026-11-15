@@ -10,7 +10,7 @@ import {
 } from "@/api/waybill";
 import type { ExecutionAction } from "@/api/types";
 import TmsIcon from "@/components/business/TmsIcon.vue";
-import TmsPageSkeleton from "@/components/business/TmsPageSkeleton.vue";
+import TmsPageSkeleton from "@mobile-core/components/TmsPageSkeleton.vue";
 import TmsRecordTimeNotice from "@/components/business/TmsRecordTimeNotice.vue";
 import TmsDateTimePicker from "@/components/business/TmsDateTimePicker.vue";
 import TmsTopBar from "@/components/business/TmsTopBar.vue";

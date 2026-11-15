@@ -1,3 +1,7 @@
 /node_modules/
 /dist/
 /artifacts/
+
+# Generated from the Mobile Pro main repository
+/src/_mobile-core/
+/src/static/fonts/NotoSansSC-OFL.txt

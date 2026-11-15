@@ -9,7 +9,7 @@ import type {
   DriverExpenseRecord,
 } from "@/api/types";
 import TmsIcon from "@/components/business/TmsIcon.vue";
-import TmsPageSkeleton from "@/components/business/TmsPageSkeleton.vue";
+import TmsPageSkeleton from "@mobile-core/components/TmsPageSkeleton.vue";
 import TmsTopBar from "@/components/business/TmsTopBar.vue";
 import WaybillExpenseSheet from "@/components/business/WaybillExpenseSheet.vue";
 import { usePageTheme } from "@/composables/usePageTheme";
