@@ -38,12 +38,6 @@ const activeStatuses: WaybillStatus[] = [
   "signed",
 ];
 
-function isJwtExpiredError(error: unknown) {
-  return (
-    error instanceof Error && /jwt expired|登录已过期/i.test(error.message)
-  );
-}
-
 export const useWaybillStore = defineStore("waybill", {
   state: (): WaybillState => ({
     list: [],
@@ -84,9 +78,9 @@ export const useWaybillStore = defineStore("waybill", {
       this.loading = true;
       try {
         await this.syncAssignedWaybills(auth.token);
-        this.list = await listWaybills(auth.token, {
-          group: targetGroup,
-        });
+        this.list = await auth.withFreshAccess((token) =>
+          listWaybills(token, { group: targetGroup }),
+        );
         return this.list;
       } finally {
         this.loading = false;
@@ -95,30 +89,26 @@ export const useWaybillStore = defineStore("waybill", {
     async loadHomeTask() {
       const auth = await this.ensureSession();
       await this.syncAssignedWaybills(auth.token);
-      const active = await listWaybills(auth.token, {
-        group: "active",
-        limit: 1,
-      });
+      const active = await auth.withFreshAccess((token) =>
+        listWaybills(token, { group: "active", limit: 1 }),
+      );
       const pending = active.length
         ? []
-        : await listWaybills(auth.token, {
-          group: "pending",
-          limit: 1,
-          });
+        : await auth.withFreshAccess((token) =>
+            listWaybills(token, { group: "pending", limit: 1 }),
+          );
       const latest =
         active.length || pending.length
           ? []
-          : await listWaybills(auth.token, {
-              group: "all",
-              limit: 1,
-            });
+          : await auth.withFreshAccess((token) =>
+              listWaybills(token, { group: "all", limit: 1 }),
+            );
       const latestTask = latest[0];
       let recoverableCompletedTask: Waybill | null = null;
       if (latestTask?.status === "completed") {
         try {
-          const context = await getWaybillExecutionContext(
-            auth.token,
-            latestTask.id,
+          const context = await auth.withFreshAccess((token) =>
+            getWaybillExecutionContext(token, latestTask.id),
           );
           if (context.needsReturnCompletion && context.canComplete) {
             recoverableCompletedTask = latestTask;
@@ -143,18 +133,11 @@ export const useWaybillStore = defineStore("waybill", {
       this.proofs = [];
       try {
         await useDictionaryStore().load(auth.token);
-        let detail: Waybill | null;
-        try {
-          detail = await getWaybill(auth.token, id);
-        } catch (error) {
-          if (!isJwtExpiredError(error)) throw error;
-          await auth.refreshSession();
-          detail = await getWaybill(auth.token, id);
-        }
+        const detail = await auth.withFreshAccess((token) => getWaybill(token, id));
         const [events, proofs] = detail
           ? await Promise.all([
-              listWaybillEvents(auth.token, id),
-              listWaybillProofs(auth.token, id),
+              auth.withFreshAccess((token) => listWaybillEvents(token, id)),
+              auth.withFreshAccess((token) => listWaybillProofs(token, id)),
             ])
           : [[], []];
         this.current = detail;

@@ -161,15 +161,13 @@ function handleTaskAction() {
               v-if="task" :waybill="task" variant="task" show-progress
               @open="openDetail(task.id)" @navigate="navigate"
             >
-              <view @tap.stop>
-                <MobileAction
-                  class="tms-primary-action task-card__button" :disabled="taskButtonDisabled"
-                  :aria-busy="waybill.actionLoading" @click="handleTaskAction"
-                >
-                  <TmsIcon :name="taskButtonIcon" size="18px" />
-                  <text>{{ taskButtonLabel }}</text>
-                </MobileAction>
-              </view>
+              <MobileAction
+                class="tms-primary-action task-card__button" :disabled="taskButtonDisabled"
+                :aria-busy="waybill.actionLoading" @click="handleTaskAction"
+              >
+                <TmsIcon :name="taskButtonIcon" size="18px" />
+                <text>{{ taskButtonLabel }}</text>
+              </MobileAction>
             </TmsRouteCard>
             <view v-else class="driver-card driver-empty">
               <view class="driver-empty__icon"><TmsIcon name="waybill" size="24px" /></view>
@@ -220,11 +218,6 @@ function handleTaskAction() {
 .home-section__heading > .mobile-group-title { margin: 0; }
 .home-section > .mobile-group-title { margin: 0; }
 .task-card__button {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  margin-top: 6px;
+  flex: 1 0 auto;
 }
 </style>

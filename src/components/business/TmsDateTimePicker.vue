@@ -2,6 +2,8 @@
 import { computed, ref, watch } from 'vue'
 import TmsIcon from './TmsIcon.vue'
 
+defineOptions({ options: { styleIsolation: 'shared' } })
+
 const props = defineProps<{
   modelValue: number
   visible: boolean

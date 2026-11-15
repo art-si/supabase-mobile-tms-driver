@@ -75,7 +75,10 @@ async function load() {
   loading.value = true;
   error.value = "";
   try {
-    context.value = await getDriverExpenseContext(auth.token, id.value);
+    auth.hydrate();
+    context.value = await auth.withFreshAccess((token) =>
+      getDriverExpenseContext(token, id.value),
+    );
     if (shouldAutoCreate.value) {
       shouldAutoCreate.value = false;
       openCreate();

@@ -177,10 +177,8 @@ async function load() {
   state.loading = true;
   try {
     current.value = await waybillStore.loadDetail(id.value);
-    context.value = await getCargoOperationContext(
-      auth.token,
-      id.value,
-      operationType.value,
+    context.value = await auth.withFreshAccess((token) =>
+      getCargoOperationContext(token, id.value, operationType.value),
     );
     const operation = context.value.operation;
     Object.assign(form, {

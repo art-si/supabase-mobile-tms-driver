@@ -22,6 +22,7 @@ import MobileSegmented from "@mobile-core/components/MobileSegmented.vue";
 import MobileTopBar from "@mobile-core/components/MobileTopBar.vue";
 import TmsPageSkeleton from "@mobile-core/components/TmsPageSkeleton.vue";
 import type { MobileIconName } from "@mobile-core/icons";
+import { MOBILE_DANGER_COLOR } from "@mobile-core/theme";
 import WaybillTrackingTimeline from "@/components/business/WaybillTrackingTimeline.vue";
 import WaybillTrajectoryPanel from "@/components/business/WaybillTrajectoryPanel.vue";
 import WaybillSignatureSheet from "@/components/business/WaybillSignatureSheet.vue";
@@ -202,8 +203,8 @@ async function load() {
     const loaded = await waybill.loadDetail(requestedId);
     if (requestedId !== id.value) return;
     const [executionResult, expenseResult] = await Promise.allSettled([
-      getWaybillExecutionContext(auth.token, requestedId),
-      getDriverExpenseContext(auth.token, requestedId),
+      auth.withFreshAccess((token) => getWaybillExecutionContext(token, requestedId)),
+      auth.withFreshAccess((token) => getDriverExpenseContext(token, requestedId)),
     ]);
     if (requestedId !== id.value) return;
     if (executionResult.status === "fulfilled") {
@@ -250,10 +251,8 @@ async function tryAutomaticCargoCheckIn(item: typeof current.value) {
   if (!operationType) return;
 
   try {
-    const context = await getCargoOperationContext(
-      auth.token,
-      item.id,
-      operationType,
+    const context = await auth.withFreshAccess((token) =>
+      getCargoOperationContext(token, item.id, operationType),
     );
     if (!context.geofenceEnabled || !context.autoCheckIn || context.operation)
       return;
@@ -275,9 +274,8 @@ async function tryAutomaticCargoCheckIn(item: typeof current.value) {
       true,
     );
     await waybill.loadDetail(item.id);
-    executionContext.value = await getWaybillExecutionContext(
-      auth.token,
-      item.id,
+    executionContext.value = await auth.withFreshAccess((token) =>
+      getWaybillExecutionContext(token, item.id),
     );
     uni.showToast({
       title: `已自动${operationType === "loading" ? "装货" : "卸货"}打卡`,
@@ -347,7 +345,7 @@ function cancel() {
     title: "取消运单",
     editable: true,
     placeholderText: "请填写取消原因（至少 4 个字）",
-    confirmColor: "#f05252",
+    confirmColor: MOBILE_DANGER_COLOR,
     success: async (result) => {
       if (!result.confirm) return;
       const reason = String(result.content || "").trim();
@@ -436,6 +434,7 @@ function viewReceipt(current?: string) {
             <MobileAction
               v-if="isAccepted"
               class="detail-danger"
+              variant="link"
               :disabled="actionBusy"
               @click="cancel"
             >{{ activeAction === 'cancel' ? '正在取消…' : '取消运单' }}</MobileAction>
@@ -534,13 +533,10 @@ function viewReceipt(current?: string) {
 }
 
 .detail-danger {
+  --mobile-action-link-color: var(--tms-red-strong);
+  --mobile-action-link-font-size: max(24rpx, 13px);
+  --mobile-action-link-active-background: var(--tms-red-soft);
   width: 100%;
-  min-height: 44px;
-  border-radius: 10px;
-  color: var(--tms-red-strong);
-  font-size: max(24rpx, 13px);
-  font-weight: 660;
-  text-align: center;
 }
 
 .detail-info-row { justify-content: space-between; }

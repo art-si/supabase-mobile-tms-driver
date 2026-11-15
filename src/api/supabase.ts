@@ -30,15 +30,19 @@ export class ApiRequestError extends Error {
   readonly code?: string
   readonly technicalMessage: string
   readonly isTechnical: boolean
+  readonly isAccessTokenExpired: boolean
 
-  constructor(data: unknown, fallback = '请求失败，请稍后重试') {
+  constructor(data: unknown, fallback = '请求失败，请稍后重试', statusCode?: number) {
     const details = getApiErrorDetails(data)
-    const isTechnical = TECHNICAL_ERROR_PATTERN.test(`${details.code || ''} ${details.message}`)
+    const isAccessTokenExpired = statusCode === 401 && /jwt expired|expired jwt/i.test(details.message)
+    const isTechnical = !isAccessTokenExpired &&
+      TECHNICAL_ERROR_PATTERN.test(`${details.code || ''} ${details.message}`)
     super(isTechnical ? fallback : normalizeKnownError(details.message, fallback))
     this.name = 'ApiRequestError'
     this.code = details.code
     this.technicalMessage = details.message
     this.isTechnical = isTechnical
+    this.isAccessTokenExpired = isAccessTokenExpired
   }
 }
 
@@ -64,7 +68,7 @@ function getApiErrorDetails(data: unknown): ApiErrorDetails {
 function normalizeKnownError(message: string, fallback: string) {
   if (!message) return fallback
   if (/invalid login credentials|invalid email or password/i.test(message)) return '账号或密码错误'
-  if (/jwt expired|token.*expired|invalid jwt/i.test(message)) return '登录已过期，请重新登录'
+  if (/jwt expired|expired jwt|token.*expired|invalid jwt/i.test(message)) return '登录已过期，请重新登录'
   if (/permission denied|row-level security|not authorized|unauthorized/i.test(message)) {
     return '暂无权限执行此操作'
   }
@@ -156,7 +160,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
           resolve(response.data as T)
           return
         }
-        const requestError = new ApiRequestError(response.data)
+        const requestError = new ApiRequestError(response.data, undefined, statusCode)
         console.warn('[api] request failed', {
           path,
           statusCode,

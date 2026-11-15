@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { listDictionaries, type DictionaryEntry, type DictionaryType } from '@/api/dictionary'
+import { useAuthStore } from './auth'
 
 interface DictionaryState {
   types: DictionaryType[]
@@ -40,14 +41,15 @@ export const useDictionaryStore = defineStore('dictionary', {
   },
   actions: {
     async load(token: string, force = false) {
-      if (!token) return
+      const auth = useAuthStore()
+      if (!token || token !== auth.token) return
       if (pendingLoad) return pendingLoad
       if (this.loaded && !force) return
 
       this.loading = true
       const revision = loadRevision
       const request = (async () => {
-        const { types, entries } = await listDictionaries(token)
+        const { types, entries } = await auth.withFreshAccess(listDictionaries)
         if (revision !== loadRevision) return
         this.types = types
         this.entries = entries

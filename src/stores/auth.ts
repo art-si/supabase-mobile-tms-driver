@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { driverPasswordLogin, driverWechatPhoneLogin, refreshToken, signOut } from '@/api/supabase'
+import { ApiRequestError, driverPasswordLogin, driverWechatPhoneLogin, refreshToken, signOut } from '@/api/supabase'
 import type { Session } from '@/api/types'
 import { useDictionaryStore } from './dictionary'
 
@@ -7,7 +7,8 @@ const STORAGE_KEY = 'tms-driver-session'
 const LOGIN_URL = '/pages/login/index'
 const LOGIN_ROUTE = 'pages/login/index'
 
-let refreshSessionPromise: Promise<void> | null = null
+let sessionRevision = 0
+let pendingRefresh: { revision: number; promise: Promise<void> } | null = null
 
 interface AuthState {
   session: Session | null
@@ -69,6 +70,7 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     clearSession(redirect = false) {
+      sessionRevision += 1
       useDictionaryStore().clear()
       this.session = null
       this.persist()
@@ -89,20 +91,46 @@ export const useAuthStore = defineStore('auth', {
         return false
       }
     },
+    async withFreshAccess<T>(read: (token: string) => Promise<T>): Promise<T> {
+      const revision = sessionRevision
+      const token = this.token
+      if (!token) throw new Error('请先登录')
+
+      let result: T
+      try {
+        result = await read(token)
+      } catch (error) {
+        if (revision !== sessionRevision || !(error instanceof ApiRequestError && error.isAccessTokenExpired)) {
+          throw error
+        }
+        if (this.token === token) await this.refreshSession()
+        if (revision !== sessionRevision || !this.token) throw new Error('登录已过期，请重新登录')
+        result = await read(this.token)
+      }
+      if (revision !== sessionRevision) throw new Error('登录已过期，请重新登录')
+      return result
+    },
     async login(account: string, password: string) {
-      this.session = normalizeSession(await driverPasswordLogin(account.trim(), password))
+      const session = await driverPasswordLogin(account.trim(), password)
+      sessionRevision += 1
+      useDictionaryStore().clear()
+      this.session = normalizeSession(session)
       this.persist()
       await useDictionaryStore().load(this.token, true)
       return this.session
     },
     async loginWithWechatPhone(phoneCode: string) {
-      this.session = normalizeSession(await driverWechatPhoneLogin(phoneCode))
+      const session = await driverWechatPhoneLogin(phoneCode)
+      sessionRevision += 1
+      useDictionaryStore().clear()
+      this.session = normalizeSession(session)
       this.persist()
       await useDictionaryStore().load(this.token, true)
       return this.session
     },
     async refreshSession(redirect = true) {
-      if (refreshSessionPromise) return refreshSessionPromise
+      const revision = sessionRevision
+      if (pendingRefresh?.revision === revision) return pendingRefresh.promise
 
       if (!this.session?.refresh_token) {
         this.clearSession(redirect)
@@ -110,23 +138,23 @@ export const useAuthStore = defineStore('auth', {
       }
 
       const currentRefreshToken = this.session.refresh_token
-      refreshSessionPromise = (async () => {
+      const promise = (async () => {
         try {
           const nextSession = normalizeSession(await refreshToken(currentRefreshToken))
+          if (revision !== sessionRevision) return
           if (!nextSession?.access_token) throw new Error('登录已过期，请重新登录')
-          if (!this.session || this.session.refresh_token !== currentRefreshToken) return
           this.session = nextSession
           this.persist()
-          await useDictionaryStore().load(this.token, true)
         } catch (error) {
-          this.clearSession(redirect)
+          if (revision === sessionRevision) this.clearSession(redirect)
           throw error
         } finally {
-          refreshSessionPromise = null
+          if (pendingRefresh?.revision === revision) pendingRefresh = null
         }
       })()
 
-      return refreshSessionPromise
+      pendingRefresh = { revision, promise }
+      return promise
     },
     async logout() {
       if (this.session?.access_token) {

@@ -15,6 +15,8 @@ import { useProfileStore } from '@/stores/profile'
 import { chooseImages } from '@mobile-core/files'
 import { formatDateTime } from '@/utils/format'
 
+defineOptions({ options: { styleIsolation: 'shared' } })
+
 const props = defineProps<{
   modelValue: boolean
   waybill: Waybill | null
@@ -66,16 +68,19 @@ watch(
 
 async function load() {
   state.error = ''
-  if (!props.waybill) {
+  const waybill = props.waybill
+  if (!waybill) {
     state.error = '运单信息不可用，请关闭后重试'
     return
   }
   state.loading = true
   try {
-    const context = await getWaybillExecutionContext(auth.token, props.waybill.id)
+    const context = await auth.withFreshAccess((token) =>
+      getWaybillExecutionContext(token, waybill.id)
+    )
     const record = context.record
     form.signedAt = record?.signedAt ? new Date(record.signedAt).getTime() : Date.now()
-    form.signerName = record?.signerName || props.waybill.receiverName || ''
+    form.signerName = record?.signerName || waybill.receiverName || ''
     form.receiptUrls = [...(record?.receiptUrls || [])]
     form.signatureUrls = [...(record?.signatureUrls || [])]
     form.remark = record?.signatureRemark || ''
@@ -214,6 +219,7 @@ function showError(error: unknown, fallback: string) {
               <MobileEvidence
                 :images="kind === 'receipt' ? form.receiptUrls : form.signatureUrls"
                 :label="kind === 'receipt' ? '签收回单' : '签字照片'"
+                :upload-label="kind === 'receipt' ? '上传回单' : '上传签字照片'"
                 :limit="kind === 'receipt' ? 5 : 3"
                 :disabled="state.submitting || Boolean(state.uploading)"
                 :uploading="state.uploading === kind"
@@ -251,11 +257,14 @@ function showError(error: unknown, fallback: string) {
 </template>
 
 <style scoped lang="scss">
+@use '@mobile-core/styles/workspace';
+
 .signature-sheet {
   display: flex;
   flex-direction: column;
   height: min(90vh, 760px);
   height: min(90dvh, 760px);
+  @include workspace.limit-bottom-sheet();
   background: var(--mobile-workspace-canvas, var(--tms-bg));
 }
 .signature-sheet__header,

@@ -322,6 +322,8 @@ async function confirmLogout() {
 </template>
 
 <style scoped lang="scss">
+@use '@mobile-core/styles/workspace';
+
 .mine-page__content {
   display: grid;
   min-width: 0;
@@ -389,6 +391,7 @@ async function confirmLogout() {
 .mine-help__panel {
   max-width: 560px;
   max-height: 80vh;
+  @include workspace.limit-bottom-sheet(80vh);
   margin-inline: auto;
   padding: 16px max(20px, var(--mobile-safe-right)) 20px max(20px, var(--mobile-safe-left));
   overflow-y: auto;

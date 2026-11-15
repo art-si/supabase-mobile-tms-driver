@@ -29,7 +29,7 @@ export const useProfileStore = defineStore('profile', {
       this.loading = true
       try {
         await useDictionaryStore().load(auth.token)
-        this.summary = await getProfileSummary(auth.token)
+        this.summary = await auth.withFreshAccess(getProfileSummary)
         return this.summary
       } finally {
         this.loading = false

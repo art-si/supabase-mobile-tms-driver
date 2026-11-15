@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import MobileAction from '@mobile-core/components/MobileAction.vue'
 import type { Waybill } from '@/api/types'
 import { calculateDistanceMeters } from '@/utils/location'
 import { getWaybillRoutePoints } from '@/utils/route'
 import { useThemeStore } from '@/stores/theme'
 import TmsIcon from './TmsIcon.vue'
+
+defineOptions({ options: { styleIsolation: 'shared' } })
 
 interface RoutePoint {
   longitude: number
@@ -726,9 +729,9 @@ onBeforeUnmount(() => {
       'route-map--embedded': embedded
     }"
   >
-    <button v-if="!embedded" class="route-map__back" aria-label="返回" hover-class="none" @tap="back">
+    <MobileAction v-if="!embedded" class="route-map__back" aria-label="返回" @click="back">
       <TmsIcon name="back" size="38rpx" />
-    </button>
+    </MobileAction>
 
     <!-- #ifdef H5 -->
     <div
@@ -768,9 +771,9 @@ onBeforeUnmount(() => {
       role="status"
     >
       <text class="route-map__planning-label">{{ routeNotice || routeError || '正在规划车行路线…' }}</text>
-      <button v-if="routeError && routeRetryable" class="route-map__retry" hover-class="none" @tap="retryRoute">
+      <MobileAction v-if="routeError && routeRetryable" class="route-map__retry" variant="link" @click="retryRoute">
         重试
-      </button>
+      </MobileAction>
     </view>
 
     <view v-if="points.length < 2" class="route-map__empty">
@@ -831,7 +834,9 @@ onBeforeUnmount(() => {
 }
 
 .route-map__planning--error {
-  max-width: calc(100% - 48rpx);
+  width: max-content;
+  max-width: calc(100% - 32px);
+  border-radius: 16px;
   color: #9a5c0b;
   background: rgba(255, 248, 235, 0.96);
   text-align: center;
@@ -843,27 +848,9 @@ onBeforeUnmount(() => {
 }
 
 .route-map__retry {
-  flex: 0 0 auto;
-  min-width: 88rpx;
-  min-height: 88rpx;
-  margin: 0;
-  padding: 0 16rpx;
-  border: 0;
-  border-radius: 999rpx;
-  color: var(--tms-primary);
-  background: #fff;
-  font-size: max(22rpx, 12px);
-  font-weight: 700;
-  line-height: 88rpx;
-}
-
-.route-map__retry::after {
-  border: 0;
-}
-
-.route-map__retry:focus-visible {
-  outline: 3rpx solid var(--tms-primary);
-  outline-offset: 3rpx;
+  flex: none;
+  min-width: 44px;
+  background: var(--tms-surface);
 }
 
 :deep(.route-map-amap-marker) {
@@ -945,8 +932,8 @@ onBeforeUnmount(() => {
   left: 28rpx;
   top: max(calc(34rpx + var(--mobile-safe-top, 0px)), var(--mobile-capsule-top, 0px));
   z-index: 3;
-  width: 88rpx;
-  height: 88rpx;
+  width: max(44px, 88rpx);
+  height: max(44px, 88rpx);
   padding: 0;
   border-radius: 50%;
   color: #344054;
@@ -955,15 +942,6 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   box-shadow: 0 8rpx 24rpx rgba(31, 41, 55, 0.12);
-}
-
-.route-map__back::after {
-  border: 0;
-}
-
-.route-map__back:focus-visible {
-  outline: 3rpx solid var(--tms-primary);
-  outline-offset: 3rpx;
 }
 
 .route-map__empty {

@@ -42,14 +42,23 @@ const accessibilityLabel = computed(() => {
     <MobileAction
       v-if="clickable"
       class="route-card__open"
+      style="display: block; width: 100%; border-radius: inherit"
       :aria-label="accessibilityLabel"
       @click="emit('open', waybill)"
     >
-      <TmsRouteSummary :waybill="waybill" :variant="variant" :show-status="showStatus" :heading="heading" />
-      <TmsIcon class="route-card__chevron" name="chevron" size="24rpx" aria-hidden="true" />
+      <view class="route-card__summary">
+        <view class="route-card__content">
+          <TmsRouteSummary :waybill="waybill" :variant="variant" :show-status="showStatus" :heading="heading" />
+        </view>
+        <view class="route-card__chevron" aria-hidden="true">
+          <TmsIcon name="chevron" size="24rpx" />
+        </view>
+      </view>
     </MobileAction>
     <view v-else class="route-card__summary">
-      <TmsRouteSummary :waybill="waybill" :variant="variant" :show-status="showStatus" :heading="heading" />
+      <view class="route-card__content">
+        <TmsRouteSummary :waybill="waybill" :variant="variant" :show-status="showStatus" :heading="heading" />
+      </view>
     </view>
 
     <view v-if="showProgress" class="route-card__progress">
@@ -58,9 +67,14 @@ const accessibilityLabel = computed(() => {
 
     <view v-if="$slots.default || showNavigation" class="route-card__actions">
       <slot />
-      <MobileAction v-if="showNavigation" class="route-card__nav" @click="emit('navigate', waybill)">
-        <TmsIcon name="nav" size="29rpx" aria-hidden="true" /> 导航
-      </MobileAction>
+      <view v-if="showNavigation" class="route-card__nav">
+        <MobileAction variant="link" @click="emit('navigate', waybill)">
+          <view class="route-card__nav-content">
+            <TmsIcon name="nav" size="29rpx" aria-hidden="true" />
+            <text>导航</text>
+          </view>
+        </MobileAction>
+      </view>
     </view>
   </view>
 </template>
@@ -74,20 +88,15 @@ const accessibilityLabel = computed(() => {
   border-radius: var(--mobile-workspace-card-radius, 20px);
 }
 
-.route-card__open,
 .route-card__summary {
   display: flex;
+  align-items: center;
   min-width: 0;
   gap: 8px;
-  width: 100%;
   padding: var(--route-card-padding);
 }
 
-.route-card__open {
-  align-items: center;
-  justify-content: space-between;
-  border-radius: inherit;
-}
+.route-card__content { flex: 1; min-width: 0; }
 
 .route-card__chevron { flex: none; color: var(--mobile-workspace-muted, var(--tms-text-secondary)); }
 .route-card__progress { margin: 0 var(--route-card-padding) 14px; }
@@ -101,18 +110,18 @@ const accessibilityLabel = computed(() => {
   border-top: 1px solid var(--mobile-workspace-line, var(--tms-line-subtle));
 }
 
-.route-card__nav {
-  display: inline-flex;
+.route-card--task .route-card__actions { padding-block: 8px; }
+
+.route-card__nav { margin-inline-start: auto; }
+.route-card__nav-content {
+  display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-width: 44px;
-  min-height: 44px;
-  margin-inline-start: auto;
-  padding-inline: 7px;
   color: var(--mobile-workspace-accent, var(--tms-primary));
   font-size: 13px;
   font-weight: 660;
+  white-space: nowrap;
 }
 
 .route-card__actions:empty { display: none; }

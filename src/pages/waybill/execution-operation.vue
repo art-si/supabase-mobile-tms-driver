@@ -112,7 +112,9 @@ async function load() {
   state.loading = true;
   try {
     await Promise.all([waybill.loadDetail(id.value), profile.load(true)]);
-    const context = await getWaybillExecutionContext(auth.token, id.value);
+    const context = await auth.withFreshAccess((token) =>
+      getWaybillExecutionContext(token, id.value),
+    );
     executionContext.value = context;
     const record = context.record;
     const time = isDeparture.value ? record?.departureTime : record?.returnTime;

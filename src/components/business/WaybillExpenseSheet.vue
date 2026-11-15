@@ -26,6 +26,8 @@ import { useDictionaryStore } from "@/stores/dictionary";
 import { chooseImages } from "@mobile-core/files";
 import { getCurrentGcj02Location } from "@/utils/location";
 
+defineOptions({ options: { styleIsolation: "shared" } });
+
 interface ExpenseAttachmentDraft {
   id: string;
   src: string;
@@ -176,7 +178,7 @@ async function prepareSheet() {
   try {
     await dictionary.load(auth.token);
     form.paymentChannel = normalizePaymentMethod(form.paymentChannel) || form.paymentChannel;
-    ocrEnabled.value = await getDriverExpenseOcrEnabled(auth.token);
+    ocrEnabled.value = await auth.withFreshAccess(getDriverExpenseOcrEnabled);
   } catch (error) {
     console.warn("failed to prepare expense dictionaries or AI config", error);
     ocrEnabled.value = true;
@@ -674,6 +676,7 @@ function showError(error: unknown, fallback: string) {
               <MobileField
                 v-model="form.invoiceNo"
                 field="expense-invoice"
+                class="expense-field__invoice"
                 label="发票号码"
                 placeholder="选填"
                 :maxlength="100"
@@ -723,9 +726,12 @@ function showError(error: unknown, fallback: string) {
 </template>
 
 <style scoped lang="scss">
+@use '@mobile-core/styles/workspace';
+
 .expense-sheet {
   height: min(91vh, 800px);
   height: min(91dvh, 800px);
+  @include workspace.limit-bottom-sheet();
   display: flex;
   flex-direction: column;
   background: var(--mobile-workspace-canvas, #f2f3f6);
@@ -785,7 +791,7 @@ function showError(error: unknown, fallback: string) {
   gap: 12px;
   align-items: start;
 }
-.expense-field__input-grid > :last-child { grid-column: 1 / -1; }
+.expense-field__invoice { grid-column: 1 / -1; }
 .expense-field--split :deep(.tms-date-trigger) {
   min-height: var(--tms-control-height);
   height: auto;
