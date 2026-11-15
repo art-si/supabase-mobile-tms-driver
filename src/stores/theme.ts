@@ -1,3 +1,3 @@
 import { createThemeStore } from '@mobile-core/theme'
 
-export const useThemeStore = createThemeStore('tms-driver-theme')
+export const useThemeStore = createThemeStore('tms-driver-theme', 'forest')

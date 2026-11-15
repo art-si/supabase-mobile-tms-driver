@@ -1,8 +1,9 @@
 import type { CargoOperationLocation } from '@/api/types'
+import { isAndroidApp } from '@mobile-core/platform'
 
 export function getCurrentGcj02Location(locationText?: string): Promise<CargoOperationLocation> {
   // #ifdef H5
-  return getBrowserGcj02Location(locationText)
+  return isAndroidApp() ? getAndroidGcj02Location(locationText) : getBrowserGcj02Location(locationText)
   // #endif
 
   // #ifndef H5
@@ -51,6 +52,35 @@ function getUniGcj02Location(locationText?: string): Promise<CargoOperationLocat
   })
 }
 
+// #ifdef H5
+async function getAndroidGcj02Location(locationText?: string): Promise<CargoOperationLocation> {
+  try {
+    const { Geolocation } = await import('@capacitor/geolocation')
+    let permission = await Geolocation.checkPermissions()
+    if (permission.location === 'prompt' || permission.location === 'prompt-with-rationale') {
+      permission = await Geolocation.requestPermissions({ permissions: ['location'] })
+    }
+    // Approximate Android location can be several kilometers from the check-in point.
+    if (permission.location === 'granted') {
+      const { coords } = await Geolocation.getCurrentPosition({
+        enableHighAccuracy: true,
+        enableLocationFallback: true,
+        timeout: 15000,
+        maximumAge: 5000
+      })
+      return resolveWgs84Location(coords, locationText)
+    }
+  } catch (error) {
+    const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined
+    if (code === 'OS-PLUG-GLOC-0003') {
+      throw new Error('请在 Android 系统设置中允许应用访问精确位置后重试')
+    }
+    if (code === 'OS-PLUG-GLOC-0010') throw new Error('定位超时，请移至开阔区域后重试')
+    throw new Error('暂时无法获取位置，请开启手机定位服务后重试')
+  }
+  throw new Error('请在 Android 系统设置中允许应用访问精确位置后重试')
+}
+
 function getBrowserGcj02Location(locationText?: string): Promise<CargoOperationLocation> {
   return new Promise((resolve, reject) => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
@@ -64,19 +94,7 @@ function getBrowserGcj02Location(locationText?: string): Promise<CargoOperationL
     }
 
     navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const [longitude, latitude] = wgs84ToGcj02(
-          position.coords.longitude,
-          position.coords.latitude
-        )
-        const resolvedText = locationText?.trim() || (await reverseGeocodeAmap(longitude, latitude))
-        resolve({
-          longitude,
-          latitude,
-          accuracyM: position.coords.accuracy,
-          locationText: resolvedText
-        })
-      },
+      (position) => resolve(resolveWgs84Location(position.coords, locationText)),
       (error) => {
         const messages: Record<number, string> = {
           1: '定位权限未开启，请在浏览器设置中允许访问位置',
@@ -93,6 +111,20 @@ function getBrowserGcj02Location(locationText?: string): Promise<CargoOperationL
     )
   })
 }
+
+async function resolveWgs84Location(
+  coords: { longitude: number; latitude: number; accuracy: number },
+  locationText?: string
+): Promise<CargoOperationLocation> {
+  const [longitude, latitude] = wgs84ToGcj02(coords.longitude, coords.latitude)
+  return {
+    longitude,
+    latitude,
+    accuracyM: coords.accuracy,
+    locationText: locationText?.trim() || (await reverseGeocodeAmap(longitude, latitude))
+  }
+}
+// #endif
 
 function formatLocationAddress(address: unknown) {
   if (typeof address === 'string') return address.trim() || undefined

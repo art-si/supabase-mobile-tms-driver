@@ -943,7 +943,7 @@ onBeforeUnmount(() => {
 .route-map__back {
   position: absolute;
   left: 28rpx;
-  top: calc(34rpx + env(safe-area-inset-top));
+  top: max(calc(34rpx + var(--mobile-safe-top, 0px)), var(--mobile-capsule-top, 0px));
   z-index: 3;
   width: 88rpx;
   height: 88rpx;

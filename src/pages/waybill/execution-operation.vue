@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import MobileWorkspace from '@mobile-core/components/MobileWorkspace.vue'
 import { computed, reactive, ref } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import { getUserFacingErrorMessage } from "@/api/supabase";
@@ -11,8 +12,10 @@ import {
 import type { ExecutionAction } from "@/api/types";
 import TmsIcon from "@/components/business/TmsIcon.vue";
 import TmsPageSkeleton from "@mobile-core/components/TmsPageSkeleton.vue";
-import TmsRecordTimeNotice from "@/components/business/TmsRecordTimeNotice.vue";
 import TmsDateTimePicker from "@/components/business/TmsDateTimePicker.vue";
+import MobileAction from "@mobile-core/components/MobileAction.vue";
+import MobileEvidence from "@mobile-core/components/MobileEvidence.vue";
+import MobileField from "@mobile-core/components/MobileField.vue";
 import MobileTopBar from "@mobile-core/components/MobileTopBar.vue";
 import { usePageTheme } from "@/composables/usePageTheme";
 import { useAuthStore } from "@/stores/auth";
@@ -59,12 +62,20 @@ const title = computed(() =>
       ? "补录回场"
       : "确认回场",
 );
-const kicker = computed(() =>
-  isDeparture.value ? "出车记录" : "回场记录",
-);
+const timeLabel = computed(() => isDeparture.value ? "实际发车时间" : "收车时间");
+const photoLabel = computed(() => isDeparture.value ? "发车照片" : "收车照片");
 const fieldTitle = computed(() =>
   isDeparture.value ? "出车里程（公里）" : "收车里程（公里）",
 );
+const odometerError = computed(() => {
+  if (!form.odometerKm) return "";
+  const value = Number(form.odometerKm);
+  if (!Number.isFinite(value) || value < 0) return "请输入有效的仪表盘里程。";
+  if (!isDeparture.value && value < Number(executionContext.value?.record?.departureOdometerKm ?? 0)) {
+    return "收车里程不得小于出车里程。";
+  }
+  return "";
+});
 const submitMissing = computed(() => {
   const missing: string[] = [];
   const odometer = Number(form.odometerKm);
@@ -125,14 +136,13 @@ async function load() {
       error,
       "执行信息加载失败，请稍后重试",
     );
-    showError(error, "执行信息加载失败");
   } finally {
     state.loading = false;
   }
 }
 
 async function uploadPhotos() {
-  if (!current.value || state.uploading) return;
+  if (!current.value || state.uploading || state.submitting) return;
   try {
     const paths = await chooseImages(5 - form.photoUrls.length);
     if (!paths.length) return;
@@ -163,11 +173,23 @@ function removePhoto(index: number) {
   form.photoUrls.splice(index, 1);
 }
 
-function preview(url: string) {
-  uni.previewImage({ current: url, urls: form.photoUrls });
+function preview(index: number) {
+  uni.previewImage({ current: form.photoUrls[index], urls: form.photoUrls });
+}
+
+function openDatePicker() {
+  if (!state.submitting) datePickerVisible.value = true;
+}
+
+function handleDateKey(event: KeyboardEvent) {
+  if ((event.key !== "Enter" && event.key !== " ") || event.repeat) return;
+  event.preventDefault();
+  event.stopPropagation();
+  openDatePicker();
 }
 
 async function submit() {
+  if (state.submitting || state.uploading || state.loading) return;
   const odometer = Number(form.odometerKm);
   if (!Number.isFinite(odometer) || odometer < 0)
     return void uni.showToast({
@@ -231,434 +253,110 @@ function showError(error: unknown, fallback: string) {
 </script>
 
 <template>
-<wd-config-provider :theme="themeName">
-  <view class="execution-page page">
-    <view class="execution-page__hero">
-      <MobileTopBar :title="title" show-back />
-      <view class="execution-page__hero-main">
-        <view class="execution-page__icon"
-          ><TmsIcon :name="isDeparture ? 'vehicle' : 'check'" size="46rpx"
-        /></view>
-        <view>
-          <text class="execution-page__kicker">{{ kicker }}</text>
-          <text class="execution-page__title">{{
-            current?.waybillNo || "运输运单"
-          }}</text>
-          <text class="execution-page__subtitle">
-            {{
-              isDeparture
-                ? "记录发车时间、出车里程和车辆照片"
-                : isRepairingReturnArchive
-                  ? "补齐历史缺失的收车时间、里程和车辆照片"
-                  : "记录收车时间、收车里程并完成运输闭环"
-            }}
-          </text>
-        </view>
-      </view>
-    </view>
-
-    <scroll-view scroll-y class="execution-page__scroll">
+  <wd-config-provider :theme="themeName">
+    <MobileWorkspace class="page driver-page execution-page" :class="themeName">
+      <MobileTopBar :title="title" :subtitle="current?.waybillNo" capsule="always" show-back />
       <TmsPageSkeleton
         v-if="state.loading || state.error"
-        :label="`正在加载${isDeparture ? '发车' : '收车'}记录…`"
+        :label="isDeparture ? '正在加载发车记录…' : '正在加载收车记录…'"
         :error="state.error"
         @retry="load"
       />
-      <view v-else class="execution-page__content">
-        <view
-          class="execution-page__notice"
-          :class="{
-            'execution-page__notice--warning': isRepairingReturnArchive,
-          }"
-        >
-          <TmsIcon name="info" size="32rpx" />
-          <text>{{
-            isDeparture
-              ? "出车里程会和收车里程配对，自动计算本次行驶公里数。发车时间支持按实际情况补录。"
-              : isRepairingReturnArchive
-                ? "系统检测到历史完成状态缺少回场档案。本次提交会补齐回场记录和车辆里程台账。"
-                : `收车里程不得小于出车里程 ${executionContext?.record?.departureOdometerKm ?? 0} 公里；时间可按实际情况补录。`
-          }}</text>
+      <view v-else class="driver-content execution-page__content mobile-content-with-dock" role="main">
+        <view v-if="isRepairingReturnArchive" class="driver-card execution-callout">
+          <TmsIcon name="info" size="18px" />
+          <text class="driver-copy">这张运单缺少回场档案。提交后将补齐回场记录和车辆里程台账。</text>
         </view>
-        <TmsRecordTimeNotice :subject="isDeparture ? '发车时间' : '收车时间'" />
-        <view class="form-card card">
-          <view class="form-card__heading">
-            <view class="form-card__step">1</view>
-            <view
-              ><strong>记录车辆状态</strong
-              ><text>请以现场实际信息为准</text></view
-            >
-          </view>
+        <view class="driver-card driver-stack" aria-labelledby="execution-vehicle-title">
+          <text id="execution-vehicle-title" class="section-title" role="heading" aria-level="2">车辆记录</text>
           <view class="field-block">
-            <text class="field-block__label"
-              >{{ isDeparture ? "实际发车时间" : "收车时间"
-              }}<text class="required-mark">*</text></text
-            >
+            <text class="execution-label">{{ timeLabel }} <text class="execution-required">*</text></text>
             <wd-cell
               custom-class="tms-date-trigger"
               :value="formatDateTime(new Date(form.occurredAt).toISOString())"
               is-link
-              :aria-label="`选择${isDeparture ? '发车' : '收车'}时间`"
-              @click="datePickerVisible = true"
+              role="button"
+              :tabindex="state.submitting ? -1 : 0"
+              :aria-label="'选择' + timeLabel"
+              :aria-disabled="state.submitting"
+              @click="openDatePicker()"
+              @keydown="handleDateKey($event)"
             />
+            <text class="driver-copy">支持补录，请按实际发生时间填写。</text>
             <TmsDateTimePicker
               v-model="form.occurredAt"
               v-model:visible="datePickerVisible"
-              :title="`选择${isDeparture ? '发车' : '收车'}时间`"
+              :title="'选择' + timeLabel"
             />
           </view>
-          <view class="field-block">
-            <text class="field-block__label"
-              >{{ fieldTitle }}<text class="required-mark">*</text></text
-            >
-            <view class="mileage-input"
-              ><wd-input
-                v-model="form.odometerKm"
-                type="digit"
-                inputmode="decimal"
-                compact
-                aria-label="仪表盘里程，单位公里"
-                placeholder="请输入仪表盘公里数"
-              /><text>km</text></view
-            >
+          <MobileField
+            v-model="form.odometerKm"
+            field="execution-odometer"
+            :label="fieldTitle"
+            inputmode="decimal"
+            placeholder="填写仪表盘公里数…"
+            :error="odometerError"
+            :disabled="state.submitting"
+            required
+          />
+          <text class="driver-copy">
+            {{ isDeparture ? "回场时用收车里程减去出车里程，计算本次行驶距离。" : "出车里程：" + (executionContext?.record?.departureOdometerKm ?? 0) + " 公里" }}
+          </text>
+        </view>
+
+        <view class="driver-card driver-stack" aria-labelledby="execution-photo-title">
+          <view class="driver-heading">
+            <text id="execution-photo-title" class="section-title" role="heading" aria-level="2">{{ photoLabel }}</text>
+            <text class="driver-copy">{{ form.photoUrls.length }}/5 张</text>
           </view>
-          <view class="field-block">
-            <text class="field-block__label"
-              >{{ isDeparture ? "发车照片" : "收车照片"
-              }}<text class="required-mark">*</text></text
-            >
-            <text class="field-block__help"
-              >拍摄车辆外观和仪表盘，确保车牌及里程清晰</text
-            >
-            <view class="evidence-grid">
-              <view
-                v-for="(url, index) in form.photoUrls"
-                :key="url"
-                class="evidence-grid__item"
-              >
-                <button
-                  class="tms-evidence-preview"
-                  :aria-label="`预览第 ${index + 1} 张${isDeparture ? '发车' : '收车'}照片`"
-                  @click="preview(url)"
-                >
-                  <image :src="url" mode="aspectFill" />
-                </button>
-                <button
-                  class="tms-evidence-remove"
-                  :aria-label="`删除第 ${index + 1} 张${isDeparture ? '发车' : '收车'}照片`"
-                  :disabled="state.uploading || state.submitting"
-                  @click="removePhoto(index)"
-                >
-                  ×
-                </button>
-              </view>
-              <button
-                v-if="form.photoUrls.length < 5"
-                class="evidence-grid__add"
-                :disabled="state.uploading"
-                @click="uploadPhotos"
-              >
-                <wd-loading
-                  v-if="state.uploading"
-                  type="circular"
-                  color="var(--tms-primary)"
-                  size="30rpx"
-                />
-                <view v-else class="evidence-grid__add-content">
-                  <TmsIcon name="camera" size="42rpx" />
-                  <text>拍照上传</text>
-                </view>
-              </button>
-            </view>
-            <text class="field-block__quota"
-              >已上传 {{ form.photoUrls.length }}/5 张</text
-            >
-          </view>
-          <view class="field-block field-block--remark">
-            <text class="field-block__label">备注</text>
-            <wd-textarea
-              v-model="form.remark"
-              custom-class="tms-form-textarea"
-              :aria-label="`${isDeparture ? '发车' : '收车'}备注`"
-              :maxlength="300"
-              placeholder="可填写现场说明"
-            />
-            <text class="field-block__count">{{ form.remark.length }}/300</text>
-          </view>
+          <text class="driver-copy">拍摄车辆外观和仪表盘，确保车牌及里程清晰。</text>
+          <MobileEvidence
+            :images="form.photoUrls"
+            :label="photoLabel"
+            :uploading="state.uploading"
+            :disabled="state.submitting"
+            @preview="preview"
+            @remove="removePhoto"
+            @upload="uploadPhotos"
+          />
+        </view>
+
+        <view class="driver-card">
+          <MobileField
+            v-model="form.remark"
+            field="execution-remark"
+            label="现场备注"
+            placeholder="选填，可补充现场情况…"
+            :maxlength="300"
+            :disabled="state.submitting"
+            multiline
+          />
         </view>
       </view>
-    </scroll-view>
 
-    <view
-      v-if="!state.loading && !state.error"
-      class="execution-footer safe-bottom"
-    >
-      <view
-        ><text>{{
-          submitMissing.length
-            ? `还需补充：${submitMissing.join("、")}`
-            : "信息已完整，请核对后提交"
-        }}</text
-        ><strong>{{
-          submitMissing.length ? "请完成必填项" : title
-        }}</strong></view
-      >
-      <wd-button
-        custom-class="tms-primary-action"
-        type="primary"
-        :round="false"
-        :loading="state.submitting"
-        loading-color="#fff"
-        :disabled="!canSubmit"
-        @click="submit"
-        >{{ title }}</wd-button
-      >
-    </view>
-  </view>
-</wd-config-provider>
+      <view v-if="!state.loading && !state.error" class="mobile-dock execution-footer" aria-label="车辆记录提交操作">
+        <text v-if="submitMissing.length" class="mobile-dock__note">还需补充：{{ submitMissing.join("、") }}</text>
+        <MobileAction
+          class="mobile-dock__action tms-primary-action"
+          :disabled="!canSubmit"
+          :aria-busy="state.submitting"
+          @click="submit"
+        >
+          {{ state.submitting ? "正在提交…" : title }}
+        </MobileAction>
+      </view>
+    </MobileWorkspace>
+  </wd-config-provider>
 </template>
 
 <style scoped lang="scss">
-.execution-page {
-  height: 100vh;
-  height: 100dvh;
-  overflow: hidden;
-  background: var(--tms-bg);
-  display: flex;
-  flex-direction: column;
-}
-.execution-page__hero {
-  flex: 0 0 auto;
-  color: #fff;
-  background: var(--tms-hero-gradient);
-}
-.execution-page__hero-main {
-  padding: 22rpx 30rpx 34rpx;
-  display: flex;
-  align-items: center;
-  gap: 20rpx;
-  border-top: 1rpx solid rgba(255, 255, 255, 0.14);
-}
-.execution-page__icon {
-  width: 82rpx;
-  height: 82rpx;
-  border-radius: 22rpx;
-  background: rgba(255, 255, 255, 0.18);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.execution-page__kicker,
-.execution-page__title,
-.execution-page__subtitle {
-  display: block;
-}
-.execution-page__kicker {
-  font-size: max(20rpx, 12px);
-  font-weight: 700;
-  letter-spacing: 2rpx;
-  opacity: 0.8;
-}
-.execution-page__title {
-  margin-top: 5rpx;
-  font-size: 32rpx;
-  font-weight: 700;
-}
-.execution-page__subtitle {
-  margin-top: 7rpx;
-  font-size: max(23rpx, 12px);
-  opacity: 0.86;
-}
-.execution-page__scroll {
-  flex: 1;
-  min-height: 0;
-  height: auto;
-}
-.execution-page__content {
-  padding: 24rpx 28rpx 50rpx;
-}
-.execution-page__notice {
-  padding: 20rpx 22rpx;
-  color: #3157bd;
-  background: #edf3ff;
-  border-radius: 16rpx;
-  display: flex;
-  gap: 12rpx;
-  font-size: max(24rpx, 12px);
-  line-height: 1.5;
-}
-.execution-page__notice--warning {
-  color: #9a5b08;
-  background: #fff7e8;
-}
-.form-card {
-  margin-top: 20rpx;
-  padding: 30rpx 28rpx;
-  border-radius: 20rpx;
-}
-.form-card__heading {
-  margin-bottom: 30rpx;
-  padding-bottom: 24rpx;
-  border-bottom: 1rpx solid #edf0f5;
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-}
-.form-card__step {
-  width: 50rpx;
-  height: 50rpx;
-  border-radius: 16rpx;
-  color: #fff;
-  background: linear-gradient(135deg, var(--tms-primary), var(--tms-primary-bright));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: max(23rpx, 12px);
-  font-weight: 700;
-}
-.form-card__heading strong,
-.form-card__heading text {
-  display: block;
-}
-.form-card__heading strong {
-  color: var(--tms-text);
-  font-size: max(27rpx, 12px);
-}
-.form-card__heading text {
-  margin-top: 4rpx;
-  color: var(--tms-muted);
-  font-size: max(21rpx, 12px);
-}
-.field-block + .field-block {
-  margin-top: 34rpx;
-}
-.field-block {
-  position: relative;
-}
-.field-block__label {
-  display: block;
-  color: var(--tms-text);
-  font-size: max(27rpx, 14px);
-  font-weight: 700;
-}
-.field-block__label .required-mark {
-  color: #ef4d57;
-}
-.field-block__help {
-  display: block;
-  margin-top: 8rpx;
-  color: var(--tms-muted);
-  font-size: max(22rpx, 12px);
-}
-.field-block__quota {
-  display: block;
-  margin-top: 10rpx;
-  color: #8b95a8;
-  font-size: max(20rpx, 12px);
-  text-align: right;
-}
-.mileage-input {
-  height: var(--tms-control-height);
-  margin-top: 14rpx;
-  padding: 0 20rpx;
-  background: #f6f8fb;
-  border: 1rpx solid #e5e9f0;
+.execution-callout { display: flex; align-items: start; gap: 8px; color: var(--tms-info); }
+.execution-label { display: block; color: var(--mobile-workspace-ink); font-size: 14px; font-weight: 650; }
+.execution-required { color: var(--tms-red-strong); }
+.field-block { display: grid; gap: 7px; min-width: 0; }
+.field-block :deep(.tms-date-trigger) {
+  margin-top: 0;
+  background: var(--tms-surface-soft);
   border-radius: var(--tms-control-radius);
-  display: flex;
-  align-items: center;
-}
-.mileage-input :deep(.wd-input) {
-  flex: 1;
-  min-width: 0;
-  width: 100%;
-}
-.mileage-input :deep(.wd-input__inner) {
-  font-size: max(28rpx, 12px);
-  font-weight: 700;
-}
-.mileage-input text {
-  color: var(--tms-muted);
-  font-size: max(24rpx, 12px);
-}
-.evidence-grid {
-  margin-top: 18rpx;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14rpx;
-}
-.evidence-grid__item,
-.evidence-grid__add {
-  box-sizing: border-box;
-  position: relative;
-  width: 100%;
-  min-width: 0;
-  aspect-ratio: 1;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  border-radius: 18rpx;
-}
-.evidence-grid__item image {
-  width: 100%;
-  height: 100%;
-}
-.evidence-grid__add {
-  color: var(--tms-primary);
-  background: var(--tms-primary-soft);
-  border: 2rpx dashed var(--tms-primary-soft-strong);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: max(22rpx, 12px);
-  line-height: 1;
-}
-.evidence-grid__add::after {
-  border: 0;
-}
-.evidence-grid__add-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8rpx;
-  line-height: 1;
-}
-.evidence-grid__add-content text {
-  display: block;
-  line-height: 1.2;
-}
-.field-block__count {
-  position: absolute;
-  right: 16rpx;
-  bottom: 14rpx;
-  color: #9aa2b1;
-  font-size: max(21rpx, 12px);
-}
-.execution-footer {
-  flex: 0 0 auto;
-  min-height: 126rpx;
-  padding: 20rpx 28rpx calc(20rpx + env(safe-area-inset-bottom));
-  background: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24rpx;
-  box-shadow: 0 -8rpx 24rpx rgba(37, 48, 73, 0.06);
-}
-.execution-footer text,
-.execution-footer strong {
-  display: block;
-}
-.execution-footer text {
-  color: var(--tms-muted);
-  font-size: max(22rpx, 12px);
-}
-.execution-footer strong {
-  margin-top: 4rpx;
-  color: var(--tms-text);
-  font-size: max(27rpx, 12px);
-}
-.execution-footer :deep(.wd-button) {
-  flex: 0 0 330rpx;
 }
 </style>

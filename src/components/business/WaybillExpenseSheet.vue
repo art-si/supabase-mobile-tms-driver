@@ -16,7 +16,10 @@ import type {
   DriverExpenseRecord,
   DriverExpenseWaybill,
 } from "@/api/types";
-import TmsRecordTimeNotice from "@/components/business/TmsRecordTimeNotice.vue";
+import MobileAction from "@mobile-core/components/MobileAction.vue";
+import MobileEvidence from "@mobile-core/components/MobileEvidence.vue";
+import MobileField from "@mobile-core/components/MobileField.vue";
+import MobileSelect from "@mobile-core/components/MobileSelect.vue";
 import TmsIcon from '@/components/business/TmsIcon.vue'
 import { useAuthStore } from "@/stores/auth";
 import { useDictionaryStore } from "@/stores/dictionary";
@@ -67,9 +70,8 @@ const form = reactive({
   remark: "",
 });
 const attachments = ref<ExpenseAttachmentDraft[]>([]);
+const attachmentImages = computed(() => attachments.value.map((item) => item.src));
 const datePickerVisible = ref(false);
-const expensePickerVisible = ref(false);
-const paymentPickerVisible = ref(false);
 const expenseDateMin = new Date(new Date().getFullYear() - 5, 0, 1).getTime();
 const expenseDateMax = new Date(new Date().getFullYear() + 1, 11, 31, 23, 59, 59).getTime();
 const initialRemoteUrls = ref<string[]>([]);
@@ -84,24 +86,21 @@ const visible = computed({
 });
 const isEditing = computed(() => Boolean(props.record));
 const expenseItemOptions = computed(() => props.expenseItems.map((item) => ({
-  value: item.id,
-  label: item.parentName ? `${item.parentName} · ${item.itemName}` : item.itemName,
+  id: item.id,
+  name: item.parentName ? `${item.parentName} · ${item.itemName}` : item.itemName,
 })));
-const selectedExpenseItem = computed(() =>
-  props.expenseItems.find((item) => item.id === form.expenseItemId),
-);
 const paymentMethods = computed(() =>
   Object.values(
     dictionary.entriesByTypeCode.tmsCashPaymentMethod || {},
   ).sort((left, right) => (left.sort || 0) - (right.sort || 0)),
 );
-const selectedPaymentMethod = computed(() =>
-  paymentMethods.value.find((item) => item.value === form.paymentChannel),
-);
-const paymentMethodOptions = computed(() => paymentMethods.value.map((item) => ({
-  value: item.value,
-  label: item.label,
-})));
+const paymentMethodOptions = computed(() => {
+  const options = paymentMethods.value.map((item) => ({ id: item.value, name: item.label }));
+  if (form.paymentChannel && !options.some((option) => option.id === form.paymentChannel)) {
+    options.push({ id: form.paymentChannel, name: form.paymentChannel });
+  }
+  return options;
+});
 const ocrConfidencePercent = computed(() =>
   Math.round((ocrResult.value?.confidence || 0) * 100),
 );
@@ -186,12 +185,15 @@ async function prepareSheet() {
   }
 }
 
-function changeExpenseItem(event: { value: Array<string | number> }) {
-  form.expenseItemId = String(event.value[0] || "");
+function openDatePicker() {
+  if (!busy.value) datePickerVisible.value = true;
 }
 
-function changePaymentMethod(event: { value: Array<string | number> }) {
-  form.paymentChannel = String(event.value[0] || "");
+function handleDateKey(event: KeyboardEvent) {
+  if ((event.key !== "Enter" && event.key !== " ") || event.repeat) return;
+  event.preventDefault();
+  event.stopPropagation();
+  openDatePicker();
 }
 
 function normalizePaymentMethod(value?: string | null) {
@@ -532,343 +534,189 @@ function showError(error: unknown, fallback: string) {
   <wd-popup
     v-model="visible"
     position="bottom"
-    safe-area-inset-bottom
     :close-on-click-modal="!busy"
-    custom-style="border-radius: 32rpx 32rpx 0 0; overflow: hidden;"
+    custom-style="width:100%;max-width:560px;margin-inline:auto;border-radius:24px 24px 0 0;overflow:hidden;padding-bottom:var(--mobile-safe-bottom,0px);"
   >
-    <view class="expense-sheet">
+    <view class="expense-sheet" role="dialog" aria-modal="true" :aria-label="isEditing ? '修改费用上报' : '新增费用上报'">
       <view class="expense-sheet__header">
-        <view>
-          <text class="expense-sheet__kicker">费用申报</text>
-          <text class="expense-sheet__title">{{
-            isEditing ? "修改费用上报" : "新增费用上报"
-          }}</text>
-          <text class="expense-sheet__subtitle">
-            提交后进入 Web 端同一套财务审批流程
-          </text>
-        </view>
-        <button
+        <text class="expense-sheet__title" role="heading" aria-level="2">{{ isEditing ? "修改费用上报" : "新增费用上报" }}</text>
+        <MobileAction
           class="expense-sheet__close"
           aria-label="关闭费用上报"
-          hover-class="expense-sheet__close--pressed"
           :disabled="busy"
           @click="close"
-        >
-          <TmsIcon name="close" size="28rpx" />
-        </button>
+        ><TmsIcon name="close" size="20px" /></MobileAction>
       </view>
 
       <scroll-view scroll-y class="expense-sheet__body">
-        <view v-if="record?.reviewRemark" class="expense-sheet__reject-note">
-          <TmsIcon name="warning" size="32rpx" />
-          <view>
-            <strong>审批驳回说明</strong>
-            <text>{{ record.reviewRemark }}</text>
+        <view class="expense-sheet__sections">
+          <view v-if="record?.reviewRemark" class="expense-sheet__reject-note">
+            <TmsIcon name="warning" size="18px" />
+            <view>
+              <text>审批驳回说明</text>
+              <text>{{ record.reviewRemark }}</text>
+            </view>
           </view>
-        </view>
 
-        <view class="expense-sheet__notice">
-          <TmsIcon name="info" size="32rpx" />
-          <text>请按实际发生金额填写，并上传清晰、完整的票据或付款凭证。</text>
-        </view>
-        <view class="expense-sheet__time-notice">
-          <TmsRecordTimeNotice subject="费用发生日期" />
-        </view>
-
-        <view class="expense-field">
-          <view class="expense-field__number">1</view>
-          <text class="expense-field__label">
-            费用项目 <text class="required-mark">*</text>
-          </text>
-          <wd-cell
-            custom-class="tms-select-trigger expense-field__picker"
-            :value="selectedExpenseItem ? `${selectedExpenseItem.parentName ? `${selectedExpenseItem.parentName} · ` : ''}${selectedExpenseItem.itemName}` : ''"
-            placeholder="请选择费用项目"
-            value-align="left"
-            is-link
-            role="button"
-            aria-label="选择费用项目"
-            @click="expensePickerVisible = true"
-          />
-          <wd-picker
-            :model-value="[form.expenseItemId]"
-            v-model:visible="expensePickerVisible"
-            :columns="expenseItemOptions"
-            title="选择费用项目"
-            @confirm="changeExpenseItem"
-          />
-        </view>
-
-        <view class="expense-field expense-field--split">
-          <view class="expense-field__number">2</view>
-          <text class="expense-field__section-title">费用明细</text>
-          <view class="expense-field__column">
-            <text class="expense-field__label">
-              金额（元） <text class="required-mark">*</text>
-            </text>
-            <view class="expense-field__money">
-              <text>¥</text>
-              <wd-input
+          <view class="expense-field">
+            <text class="expense-field__title" role="heading" aria-level="3">费用明细</text>
+            <MobileField field="expense-item" label="费用项目" required>
+              <MobileSelect
+                v-model="form.expenseItemId"
+                field="expense-item"
+                class="expense-field__picker"
+                :options="expenseItemOptions"
+                label="选择费用项目"
+                placeholder="请选择费用项目"
+                :disabled="busy"
+              />
+            </MobileField>
+            <view class="expense-field--split">
+              <MobileField
                 v-model="form.amount"
-                type="digit"
+                field="expense-amount"
+                label="金额（元）"
                 inputmode="decimal"
-                compact
-                :maxlength="12"
-                aria-label="费用金额"
                 placeholder="0.00"
-              />
-            </view>
-          </view>
-          <view class="expense-field__column">
-            <text class="expense-field__label">
-              发生日期 <text class="required-mark">*</text>
-            </text>
-            <wd-cell
-              custom-class="tms-date-trigger"
-              :value="formatLocalDate(form.occurredAt)"
-              is-link
-              aria-label="选择费用发生日期"
-              @click="datePickerVisible = true"
-            />
-            <wd-calendar
-              v-model="form.occurredAt"
-              v-model:visible="datePickerVisible"
-              type="date"
-              title="选择费用发生日期"
-              switch-mode="year-month"
-              :min-date="expenseDateMin"
-              :max-date="expenseDateMax"
-            />
-          </view>
-        </view>
-
-        <view class="expense-field">
-          <view class="expense-field__number">3</view>
-          <text class="expense-field__label">
-            费用凭证 <text class="required-mark">*</text>
-          </text>
-          <text class="expense-field__help">支持票据、付款截图或现场凭证，最多 5 张</text>
-          <view
-            class="expense-ocr"
-            :class="{ 'expense-ocr--disabled': !ocrEnabled }"
-          >
-            <view class="expense-ocr__head">
-              <view class="expense-ocr__identity">
-                <view class="expense-ocr__icon">
-                  <TmsIcon name="camera" size="30rpx" />
-                </view>
-                <view>
-                  <strong>AI 智能识别票据</strong>
-                  <text>
-                    {{
-                      ocrEnabled
-                        ? "自动提取金额、日期、商户和支付方式"
-                        : "智能识别已由平台管理员停用"
-                    }}
-                  </text>
-                </view>
-              </view>
-              <button
-                class="expense-ocr__analyze"
-                :disabled="
-                  busy ||
-                  state.loadingAiConfig ||
-                  !ocrEnabled ||
-                  !attachments.length
-                "
-                @click="analyzeAttachments"
-              >
-                <view class="tms-inline-action">
-                  <wd-loading
-                    v-if="
-                      state.loadingAiConfig || state.analyzing || state.uploading
-                    "
-                    type="circular"
-                    color="var(--tms-primary)"
-                    size="24rpx"
-                  />
-                  <TmsIcon v-else name="camera" size="24rpx" />
-                  <text>{{ ocrActionLabel }}</text>
-                </view>
-              </button>
-            </view>
-            <view v-if="ocrResult" class="expense-ocr__result">
-              <view class="expense-ocr__result-head">
-                <text>识别完成 · 可信度 {{ ocrConfidencePercent }}%</text>
-                <text v-if="appliedOcrResult" class="expense-ocr__applied">已应用</text>
-              </view>
-              <text class="expense-ocr__summary">{{ ocrResult.summary }}</text>
-              <text v-if="ocrResult.warnings.length" class="expense-ocr__warning">
-                {{ ocrResult.warnings.slice(0, 2).join("；") }}
-              </text>
-              <button
-                class="expense-ocr__apply"
+                :maxlength="12"
                 :disabled="busy"
-                @click="applyOcrResult"
-              >
-                {{ appliedOcrResult ? "重新应用识别结果" : "应用到费用表单" }}
-              </button>
-            </view>
-            <text v-else-if="!attachments.length" class="expense-ocr__empty">
-              拍照上传票据后即可识别，结果应用前可先核对。
-            </text>
-          </view>
-          <view class="expense-evidence">
-            <view
-              v-for="(attachment, index) in attachments"
-              :key="attachment.id"
-              class="expense-evidence__item"
-            >
-              <button
-                class="tms-evidence-preview"
-                :aria-label="`预览第 ${index + 1} 张费用凭证`"
-                @click="previewAttachment(index)"
-              >
-                <image :src="attachment.src" mode="aspectFill" />
-              </button>
-              <button
-                class="tms-evidence-remove"
-                :aria-label="`删除第 ${index + 1} 张费用凭证`"
-                :disabled="busy"
-                @click="removeAttachment(index)"
-              >
-                <TmsIcon name="close" size="24rpx" />
-              </button>
-            </view>
-            <button
-              v-if="attachments.length < 5"
-              class="expense-evidence__add"
-              aria-label="添加费用凭证"
-              :disabled="busy"
-              @click="addAttachments"
-            >
-              <wd-loading
-                v-if="state.choosing"
-                type="circular"
-                color="var(--tms-primary)"
-                size="30rpx"
+                required
               />
-              <view v-else>
-                <TmsIcon name="camera" size="42rpx" />
-                <text>拍照上传</text>
-              </view>
-            </button>
-          </view>
-          <text class="expense-field__quota">{{ attachments.length }}/5 张</text>
-        </view>
-
-        <view class="expense-field">
-          <view class="expense-field__number">4</view>
-          <text class="expense-field__label">补充信息</text>
-          <view class="expense-field__input-grid">
-            <label>
-              <text>商户 / 收款方</text>
-              <wd-input
-                v-model="form.providerName"
-                custom-class="tms-form-input tms-form-input--small"
-                :maxlength="100"
-                placeholder="可选填"
-              />
-            </label>
-            <label>
-              <text>支付方式</text>
-              <wd-cell
-                custom-class="tms-select-trigger tms-select-trigger--small expense-field__compact-picker"
-                :value="selectedPaymentMethod?.label || form.paymentChannel"
-                :placeholder="paymentMethods.length ? '请选择支付方式' : '支付方式字典未配置'"
-                value-align="left"
-                is-link
-                role="button"
-                aria-label="选择支付方式"
-                :aria-disabled="busy || !paymentMethods.length"
-                @click="!busy && paymentMethods.length && (paymentPickerVisible = true)"
-              />
-              <wd-picker
-                :model-value="[form.paymentChannel]"
-                v-model:visible="paymentPickerVisible"
-                :columns="paymentMethodOptions"
-                title="选择支付方式"
-                @confirm="changePaymentMethod"
-              />
-            </label>
-            <label>
-              <text>发票号码</text>
-              <wd-input
-                v-model="form.invoiceNo"
-                custom-class="tms-form-input tms-form-input--small"
-                :maxlength="100"
-                placeholder="可选填"
-              />
-            </label>
-          </view>
-          <view class="expense-field__location-row">
-            <view class="expense-field__location-input">
-              <wd-input
-                v-model="form.expenseLocation"
-                compact
-                :maxlength="300"
-                aria-label="费用发生地点"
-                placeholder="费用发生地点（可选）"
-              />
-            </view>
-            <button
-              aria-label="记录当前位置"
-              :disabled="busy"
-              @click="locateExpense"
-            >
-              <view class="tms-inline-action">
-                <wd-loading
-                  v-if="state.locating"
-                  type="circular"
-                  color="var(--tms-primary)"
-                  size="24rpx"
+              <MobileField field="expense-date" label="发生日期" required>
+                <wd-cell
+                  id="expense-date"
+                  custom-class="tms-date-trigger expense-field__date"
+                  :value="formatLocalDate(form.occurredAt)"
+                  is-link
+                  role="button"
+                  :tabindex="busy ? -1 : 0"
+                  aria-label="选择费用发生日期"
+                  :aria-disabled="busy"
+                  @click="openDatePicker()"
+                  @keydown="handleDateKey($event)"
                 />
-                <TmsIcon v-else name="location" size="26rpx" />
-                <text>{{ state.locating ? "定位中" : "当前位置" }}</text>
-              </view>
-            </button>
+                <wd-calendar
+                  v-model="form.occurredAt"
+                  v-model:visible="datePickerVisible"
+                  type="date"
+                  title="选择费用发生日期"
+                  switch-mode="year-month"
+                  :min-date="expenseDateMin"
+                  :max-date="expenseDateMax"
+                />
+              </MobileField>
+            </view>
+            <text class="expense-field__help">支持补录，请填写实际发生日期。</text>
           </view>
-          <wd-textarea
-            v-model="form.remark"
-            custom-class="tms-form-textarea"
-            :maxlength="500"
-            aria-label="费用说明"
-            placeholder="补充费用原因、行程或异常说明（可选）"
-          />
-          <text class="expense-field__count">{{ form.remark.length }}/500</text>
+
+          <view class="expense-field">
+            <view class="expense-field__heading">
+              <text class="expense-field__title" role="heading" aria-level="3">费用凭证 <text class="required-mark">*</text></text>
+              <text class="expense-field__help">{{ attachments.length }}/5 张</text>
+            </view>
+            <text class="expense-field__help">请上传清晰、完整的票据、付款截图或现场凭证。</text>
+            <MobileEvidence
+              :images="attachmentImages"
+              label="费用凭证"
+              upload-label="添加费用凭证"
+              :uploading="state.choosing"
+              :disabled="busy"
+              @upload="addAttachments"
+              @preview="previewAttachment"
+              @remove="removeAttachment"
+            />
+            <view v-if="attachments.length && ocrEnabled" class="expense-ocr">
+              <view class="expense-field__heading">
+                <view class="expense-ocr__identity">
+                  <text>识别票据</text>
+                  <text class="expense-field__help">提取金额、日期、商户和支付方式。</text>
+                </view>
+                <MobileAction
+                  class="expense-ocr__analyze"
+                  variant="link"
+                  :disabled="busy || state.loadingAiConfig"
+                  @click="analyzeAttachments"
+                >{{ ocrActionLabel }}</MobileAction>
+              </view>
+              <view v-if="ocrResult" class="expense-ocr__result">
+                <text class="expense-field__help">可信度 {{ ocrConfidencePercent }}%{{ appliedOcrResult ? " · 已应用" : "" }}</text>
+                <text>{{ ocrResult.summary }}</text>
+                <text v-if="ocrResult.warnings.length" class="expense-ocr__warning">{{ ocrResult.warnings.slice(0, 2).join("；") }}</text>
+                <MobileAction class="expense-ocr__apply" variant="link" :disabled="busy" @click="applyOcrResult">
+                  {{ appliedOcrResult ? "重新应用识别结果" : "应用到费用表单" }}
+                </MobileAction>
+              </view>
+            </view>
+          </view>
+
+          <view class="expense-field">
+            <text class="expense-field__title" role="heading" aria-level="3">补充信息</text>
+            <view class="expense-field__input-grid">
+              <MobileField
+                v-model="form.providerName"
+                field="expense-provider"
+                label="商户 / 收款方"
+                placeholder="选填"
+                :maxlength="100"
+                :disabled="busy"
+              />
+              <MobileField field="expense-payment" label="支付方式">
+                <MobileSelect
+                  v-model="form.paymentChannel"
+                  field="expense-payment"
+                  class="expense-field__compact-picker"
+                  :options="paymentMethodOptions"
+                  label="选择支付方式"
+                  :placeholder="paymentMethods.length ? '选填' : '暂无可用方式'"
+                  :disabled="busy || !paymentMethods.length"
+                />
+              </MobileField>
+              <MobileField
+                v-model="form.invoiceNo"
+                field="expense-invoice"
+                label="发票号码"
+                placeholder="选填"
+                :maxlength="100"
+                :disabled="busy"
+              />
+            </view>
+            <view class="expense-field__location-row">
+              <MobileField
+                v-model="form.expenseLocation"
+                field="expense-location"
+                label="费用发生地点"
+                placeholder="选填"
+                :maxlength="300"
+                :disabled="busy"
+              />
+              <MobileAction variant="link" :disabled="busy" @click="locateExpense">
+                <TmsIcon name="location" size="16px" />
+                <text>{{ state.locating ? "定位中…" : "当前位置" }}</text>
+              </MobileAction>
+            </view>
+            <MobileField
+              v-model="form.remark"
+              field="expense-remark"
+              label="费用说明"
+              placeholder="选填，可说明费用原因或异常情况…"
+              :maxlength="500"
+              :disabled="busy"
+              multiline
+            />
+          </view>
         </view>
-        <view class="expense-sheet__body-space" />
       </scroll-view>
 
       <view class="expense-sheet__footer">
-        <text class="expense-sheet__completion">
-          {{
-            missingFields.length
-              ? `还需补充：${missingFields.join("、")}`
-              : "资料已完整，提交后进入财务审批"
-          }}
-        </text>
-        <wd-button
-          custom-class="tms-secondary-action"
-          variant="plain"
-          type="primary"
-          :round="false"
-          :disabled="busy"
-          @click="close"
-        >
-          取消
-        </wd-button>
-        <wd-button
-          custom-class="tms-primary-action"
-          type="primary"
-          :round="false"
-          :loading="state.submitting"
-          loading-color="#ffffff"
+        <text v-if="missingFields.length" class="expense-sheet__completion">还需补充：{{ missingFields.join("、") }}</text>
+        <MobileAction
+          class="mobile-dock__action tms-primary-action"
+          :aria-busy="state.submitting"
           :disabled="!canSubmit"
           @click="submit"
         >
-          {{ state.uploading ? "正在上传凭证" : isEditing ? "重新提交" : "提交审批" }}
-        </wd-button>
+          {{ state.uploading ? "正在上传凭证…" : state.submitting ? "正在提交…" : isEditing ? "重新提交" : "提交审批" }}
+        </MobileAction>
       </view>
     </view>
   </wd-popup>
@@ -876,605 +724,103 @@ function showError(error: unknown, fallback: string) {
 
 <style scoped lang="scss">
 .expense-sheet {
-  height: min(94vh, 1320rpx);
-  height: min(94dvh, 1320rpx);
-  overflow: hidden;
-  background: #f4f6fa;
+  height: min(91vh, 800px);
+  height: min(91dvh, 800px);
   display: flex;
   flex-direction: column;
-  overscroll-behavior: contain;
+  background: var(--mobile-workspace-canvas, #f2f3f6);
+  color: var(--tms-text-strong);
 }
-
+.expense-sheet__header, .expense-sheet__footer {
+  flex: none;
+  padding-inline: max(16px, var(--mobile-safe-left)) max(16px, var(--mobile-safe-right));
+  background: var(--tms-surface);
+}
 .expense-sheet__header {
-  position: relative;
-  flex: 0 0 auto;
-  padding: 30rpx 108rpx 24rpx 30rpx;
-  border-bottom: 1rpx solid #e9edf3;
-  background: #fff;
-}
-
-.expense-sheet__kicker,
-.expense-sheet__title,
-.expense-sheet__subtitle {
-  display: block;
-}
-
-.expense-sheet__kicker {
-  color: var(--tms-primary);
-  font-size: max(20rpx, 12px);
-  font-weight: 700;
-  letter-spacing: 2rpx;
-}
-
-.expense-sheet__title {
-  margin-top: 5rpx;
-  color: var(--tms-text);
-  font-size: 36rpx;
-  font-weight: 700;
-}
-
-.expense-sheet__subtitle {
-  margin-top: 7rpx;
-  color: var(--tms-muted);
-  font-size: max(23rpx, 12px);
-}
-
-.expense-sheet__close {
-  box-sizing: border-box;
-  position: absolute;
-  top: 24rpx;
-  right: 24rpx;
-  width: 56rpx;
-  height: 56rpx;
-  margin: 0;
-  padding: 0;
-  border: 1rpx solid #e4e8ef;
-  border-radius: 50%;
-  color: #747f91;
-  background: #f1f3f7;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  touch-action: manipulation;
-  transition:
-    color 160ms ease,
-    background-color 160ms ease,
-    transform 160ms ease;
-}
-
-.expense-sheet__close::after,
-.expense-evidence button::after,
-.expense-ocr button::after,
-.expense-field__location-row button::after {
-  border: 0;
-}
-
-.expense-sheet__close--pressed,
-.expense-sheet__close:active {
-  color: var(--tms-primary);
-  background: #e8ebf3;
-  transform: scale(0.94);
-}
-
-.expense-sheet__close:focus-visible,
-.expense-evidence button:focus-visible,
-.expense-ocr button:focus-visible,
-.expense-field__location-row button:focus-visible {
-  outline: 4rpx solid rgba(var(--tms-primary-rgb), 0.24);
-  outline-offset: 3rpx;
-}
-
-.expense-sheet__body {
-  flex: 1;
-  min-height: 0;
-}
-
-.expense-sheet__notice,
-.expense-sheet__reject-note {
-  margin: 22rpx 26rpx 0;
-  padding: 20rpx 22rpx;
-  border-radius: 16rpx;
-  display: flex;
-  align-items: flex-start;
-  gap: 12rpx;
-  font-size: max(23rpx, 12px);
-  line-height: 1.55;
-}
-
-.expense-sheet__notice {
-  color: #3157bd;
-  background: #edf3ff;
-}
-
-.expense-sheet__time-notice {
-  margin-right: 26rpx;
-  margin-left: 26rpx;
-}
-
-.expense-sheet__reject-note {
-  color: #b42318;
-  background: #fff1f0;
-}
-
-.expense-sheet__reject-note view,
-.expense-sheet__reject-note strong,
-.expense-sheet__reject-note text {
-  min-width: 0;
-  display: block;
-}
-
-.expense-sheet__reject-note text {
-  margin-top: 4rpx;
-}
-
-.expense-field {
-  position: relative;
-  margin: 20rpx 26rpx 0;
-  padding: 26rpx;
-  border: 1rpx solid rgba(226, 231, 239, 0.9);
-  border-radius: 20rpx;
-  background: #fff;
-  box-shadow: 0 8rpx 24rpx rgba(46, 61, 93, 0.05);
-}
-
-.expense-field__number {
-  position: absolute;
-  top: 22rpx;
-  right: 24rpx;
-  width: 42rpx;
-  height: 42rpx;
-  border-radius: 14rpx;
-  color: var(--tms-primary);
-  background: var(--tms-primary-soft);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: max(20rpx, 12px);
-  font-weight: 700;
-}
-
-.expense-field__label {
-  display: block;
-  color: var(--tms-text);
-  font-size: max(27rpx, 14px);
-  font-weight: 700;
-}
-
-.expense-field__help {
-  display: block;
-  margin-top: 8rpx;
-  color: var(--tms-muted);
-  font-size: max(22rpx, 12px);
-}
-
-.expense-ocr {
-  margin-top: 18rpx;
-  padding: 18rpx;
-  border: 1rpx solid var(--tms-primary-soft-strong);
-  border-radius: 18rpx;
-  background: linear-gradient(135deg, #fff 0%, var(--tms-primary-soft) 100%);
-}
-
-.expense-ocr--disabled {
-  border-color: #e5e8ee;
-  background: #f6f7f9;
-}
-
-.expense-ocr__head,
-.expense-ocr__identity,
-.expense-ocr__identity > view:last-child,
-.expense-ocr__analyze,
-.expense-ocr__result,
-.expense-ocr__result-head {
-  min-width: 0;
-  display: flex;
-}
-
-.expense-ocr__head,
-.expense-ocr__result-head {
   align-items: center;
   justify-content: space-between;
-  gap: 14rpx;
+  gap: 12px;
+  padding-block: 6px;
+  border-bottom: 1px solid var(--tms-line-subtle);
 }
-
-.expense-ocr__identity {
-  flex: 1;
-  align-items: center;
-  gap: 12rpx;
+.expense-sheet__title { font-size: 20px; line-height: 1.25; font-weight: 750; letter-spacing: -.015em; }
+.mobile-action.expense-sheet__close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: var(--tms-surface-soft);
+  color: var(--tms-muted);
 }
-
-.expense-ocr__identity > view:last-child,
-.expense-ocr__result {
-  flex-direction: column;
-}
-
-.expense-ocr__identity strong,
-.expense-ocr__identity text,
-.expense-ocr__result text {
+.expense-sheet__body { min-height: 0; height: 0; flex: 1; }
+.expense-sheet__sections {
+  display: grid;
   min-width: 0;
-  display: block;
+  gap: 12px;
+  padding: 12px max(16px, var(--mobile-safe-right)) 16px max(16px, var(--mobile-safe-left));
 }
-
-.expense-ocr__identity strong {
-  color: #28375f;
-  font-size: max(23rpx, 12px);
-  font-weight: 700;
+.expense-field {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--tms-line-subtle);
+  border-radius: 16px;
+  background: var(--tms-surface);
 }
-
-.expense-ocr__identity text,
-.expense-ocr__empty {
-  margin-top: 3rpx;
-  color: #6f7b92;
-  font-size: max(20rpx, 12px);
-  line-height: 1.45;
+.expense-field__title { color: var(--tms-text-strong); font-size: 16px; font-weight: 720; line-height: 1.3; }
+.expense-field__heading { display: flex; align-items: center; justify-content: space-between; min-width: 0; gap: 8px; }
+.expense-field__help, .expense-sheet__completion {
+  color: var(--tms-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
-
-.expense-ocr__icon {
-  flex: 0 0 54rpx;
-  width: 54rpx;
-  height: 54rpx;
-  border-radius: 16rpx;
-  color: var(--tms-primary);
-  background: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4rpx 12rpx rgba(var(--tms-primary-rgb), 0.1);
+.expense-field--split, .expense-field__input-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
 }
-
-.expense-ocr__analyze,
-.expense-ocr__apply {
-  box-sizing: border-box;
-  margin: 0;
-  border: 0;
-  color: var(--tms-primary);
-  background: #fff;
-  font-weight: 700;
-  line-height: 1;
-  touch-action: manipulation;
+.expense-field__input-grid > :last-child { grid-column: 1 / -1; }
+.expense-field--split :deep(.tms-date-trigger) {
+  min-height: var(--tms-control-height);
+  height: auto;
+  margin-top: 0;
+  padding-inline: 12px;
+  border-radius: var(--tms-control-radius);
+  background: var(--tms-surface-soft);
 }
-
-.expense-ocr__analyze {
-  flex: 0 0 auto;
-  min-width: 136rpx;
-  height: 64rpx;
-  padding: 0 16rpx;
-  border-radius: 14rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7rpx;
-  font-size: max(20rpx, 12px);
-}
-
-.expense-ocr__analyze[disabled],
-.expense-ocr__apply[disabled] {
-  color: #9ca6b7;
-  background: #f0f2f5;
-  opacity: 1;
-}
-
+.expense-field__location-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px; }
+.expense-field__location-row :deep(.mobile-action) { gap: 5px; }
+.expense-ocr { display: grid; min-width: 0; gap: 8px; padding-top: 8px; border-top: 1px solid var(--tms-line-subtle); }
+.expense-ocr__identity { min-width: 0; display: grid; gap: 3px; font-size: 14px; font-weight: 650; }
+.expense-ocr__identity .expense-field__help { font-weight: 400; }
 .expense-ocr__result {
-  margin-top: 16rpx;
-  padding-top: 14rpx;
-  border-top: 1rpx solid rgba(var(--tms-primary-rgb), 0.14);
-  gap: 8rpx;
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--tms-surface-soft);
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
-
-.expense-ocr__result-head {
-  color: #354577;
-  font-size: max(21rpx, 12px);
-  font-weight: 700;
-}
-
-.expense-ocr__applied {
-  padding: 5rpx 10rpx;
-  border-radius: 999rpx;
-  color: #087c5a;
-  background: #dcf8ed;
-  font-size: max(18rpx, 12px);
-}
-
-.expense-ocr__summary,
-.expense-ocr__warning {
-  color: #5e6a82;
-  font-size: max(20rpx, 12px);
+.expense-ocr__apply { justify-self: start; }
+.expense-ocr__warning { color: var(--tms-orange-strong); }
+.expense-sheet__reject-note {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  color: var(--tms-red-strong);
+  background: var(--tms-red-soft);
+  font-size: 13px;
   line-height: 1.5;
 }
-
-.expense-ocr__warning {
-  color: #a05a16;
-}
-
-.expense-ocr__apply {
-  width: 100%;
-  height: 88rpx;
-  margin-top: 4rpx;
-  border: 1rpx solid var(--tms-primary-soft-strong);
-  border-radius: 14rpx;
-  font-size: max(21rpx, 12px);
-}
-
-.expense-ocr__empty {
-  display: block;
-  margin-top: 14rpx;
-}
-
-.expense-field__picker,
-.expense-field__money,
-.expense-field__compact-picker,
-.expense-field__location-row,
-:deep(.expense-field .tms-form-textarea) {
-  box-sizing: border-box;
-  border: 1rpx solid #e5eaf1;
-  border-radius: 16rpx;
-  background: #f6f8fb;
-}
-
-.expense-field__picker {
-  min-height: var(--tms-control-height);
-  margin-top: 16rpx;
-  padding: 0 20rpx;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20rpx;
-  color: var(--tms-text);
-  font-size: max(26rpx, 12px);
-  font-weight: 700;
-}
-
-.expense-field__picker text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.expense-field__picker--placeholder {
-  color: #9aa5b7;
-  font-weight: 500;
-}
-
-.expense-field--split {
-  padding-right: 26rpx;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18rpx;
-}
-
-.expense-field__section-title {
-  grid-column: 1 / -1;
-  display: block;
-  min-height: 42rpx;
-  color: var(--tms-text);
-  font-size: max(27rpx, 12px);
-  font-weight: 700;
-  line-height: 42rpx;
-}
-
-.expense-field__column {
-  min-width: 0;
-}
-
-.expense-field__money {
-  height: var(--tms-control-height);
-  margin-top: 16rpx;
-  padding: 0 18rpx;
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-}
-
-.expense-field__money > text {
-  color: var(--tms-primary);
-  font-size: max(28rpx, 12px);
-  font-weight: 700;
-}
-
-.expense-field__money :deep(.wd-input) {
-  min-width: 0;
-  flex: 1;
-  width: 100%;
-}
-
-.expense-field__money :deep(.wd-input__inner) {
-  font-size: max(28rpx, 12px);
-  font-weight: 700;
-}
-
-.expense-field--split :deep(.tms-date-trigger) {
-  margin-top: 16rpx;
-}
-
-.expense-evidence {
-  margin-top: 18rpx;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14rpx;
-}
-
-.expense-evidence__item,
-.expense-evidence__add {
-  box-sizing: border-box;
-  position: relative;
-  width: 100%;
-  min-width: 0;
-  aspect-ratio: 1;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  border-radius: 18rpx;
-}
-
-.expense-evidence__item image {
-  width: 100%;
-  height: 100%;
-}
-
-
-.expense-evidence__add {
-  color: var(--tms-primary);
-  border: 2rpx dashed var(--tms-primary-soft-strong);
-  background: var(--tms-primary-soft);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: max(22rpx, 12px);
-}
-
-.expense-evidence__add > view {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8rpx;
-}
-
-.expense-field__quota {
-  display: block;
-  margin-top: 10rpx;
-  color: #8b95a8;
-  font-size: max(20rpx, 12px);
-  text-align: right;
-}
-
-.expense-field__input-grid {
-  margin-top: 16rpx;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14rpx;
-}
-
-.expense-field__input-grid label:last-child {
-  grid-column: 1 / -1;
-}
-
-.expense-field__input-grid label > text {
-  display: block;
-  margin-bottom: 8rpx;
-  color: var(--tms-muted);
-  font-size: max(21rpx, 12px);
-  font-weight: 600;
-}
-
-
-.expense-field__compact-picker {
-  height: var(--tms-control-height);
-  padding: 0 16rpx;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10rpx;
-  color: var(--tms-text);
-  font-size: max(24rpx, 12px);
-  font-weight: 700;
-}
-
-.expense-field__compact-picker text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.expense-field__compact-picker--placeholder {
-  color: #9aa5b7;
-  font-weight: 500;
-}
-
-.expense-field__location-row {
-  height: var(--tms-control-height);
-  margin-top: 16rpx;
-  padding-left: 16rpx;
-  display: flex;
-  align-items: center;
-}
-
-.expense-field__location-input {
-  min-width: 0;
-  flex: 1;
-}
-
-.expense-field__location-input :deep(.wd-input) {
-  width: 100%;
-}
-.expense-field__location-row :deep(.wd-input__inner) {
-  font-size: max(24rpx, 12px);
-}
-
-.expense-field__location-row button {
-  flex: 0 0 auto;
-  min-height: 44px;
-  margin: 0 6rpx;
-  padding: 0 16rpx;
-  border: 0;
-  border-radius: 13rpx;
-  color: var(--tms-primary);
-  background: var(--tms-primary-soft);
-  display: flex;
-  align-items: center;
-  gap: 6rpx;
-  font-size: max(21rpx, 12px);
-  font-weight: 700;
-  line-height: 1;
-}
-
-.expense-field textarea {
-  width: 100%;
-  height: 150rpx;
-  margin-top: 16rpx;
-  padding: 18rpx 18rpx 46rpx;
-  font-size: max(24rpx, 12px);
-}
-
-.expense-field__count {
-  position: absolute;
-  right: 42rpx;
-  bottom: 38rpx;
-  color: #9aa5b7;
-  font-size: max(20rpx, 12px);
-}
-
-.expense-sheet__body-space {
-  height: 30rpx;
-}
-
-.expense-sheet__footer {
-  flex: 0 0 auto;
-  padding: 18rpx 26rpx calc(18rpx + env(safe-area-inset-bottom));
-  background: #fff;
-  display: grid;
-  grid-template-columns: 1fr 1.8fr;
-  gap: 16rpx;
-  box-shadow: 0 -8rpx 24rpx rgba(37, 48, 73, 0.07);
-}
-
-.expense-sheet__completion {
-  grid-column: 1 / -1;
-  color: var(--tms-muted);
-  font-size: max(21rpx, 12px);
-  text-align: center;
-}
-
-@media screen and (max-width: 360px) {
-  .expense-field--split,
-  .expense-field__input-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .expense-field__input-grid label:last-child {
-    grid-column: auto;
-  }
-
-  .expense-ocr__head {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .expense-ocr__analyze {
-    width: 100%;
-    min-height: 72rpx;
-  }
-}
+.expense-sheet__reject-note > view { display: grid; min-width: 0; gap: 4px; overflow-wrap: anywhere; }
+.expense-sheet__footer { display: grid; gap: 6px; padding-block: 8px 10px; border-top: 1px solid var(--tms-line-subtle); }
 </style>

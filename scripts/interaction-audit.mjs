@@ -12,6 +12,9 @@ const width = Number(process.env.TMS_AUDIT_WIDTH || 393)
 const results = []
 const dialogs = []
 const pageErrors = []
+const listReady = '.route-card--list .route-card__open, .driver-empty'
+const detailReady = '.route-card--detail'
+const detailProof = '[aria-label^="预览"][aria-label$="张运输单据"]'
 
 if (!account || !password) throw new Error('Provide the driver account and password for this local audit.')
 await mkdir(output, { recursive: true })
@@ -55,7 +58,7 @@ async function visit(path, ready) {
   if (path.startsWith('/pages/waybill/detail')) {
     await page.evaluate(() => {
       window.__auditDomEvents = []
-      for (const selector of ['.proof-card__image', '.detail-actions__receipt', '.detail-actions__expense', '.route-card__nav .wd-button', '[aria-label^="拨打"]']) {
+      for (const selector of ['[aria-label$="张运输单据"]', '.detail-actions .detail-operation', '.route-card--detail .driver-inline', '.route-card__nav', '[aria-label^="拨打"]']) {
         const element = document.querySelector(selector)
         for (const type of ['click', 'tap']) {
           element?.addEventListener(type, () => window.__auditDomEvents.push(`${selector}:${type}`))
@@ -97,7 +100,7 @@ async function step(name, action, options = {}) {
 
 try {
   await visit('/pages/login/index', '.login-form')
-  await step('login-forgot-password', () => page.locator('.login-form__link').click())
+  await step('login-forgot-password', () => page.getByRole('button', { name: '忘记密码？' }).click())
   await step('login-remember-toggle', () => page.locator('.login-form__remember').click())
   await page.locator('input').nth(0).fill(account)
   await page.locator('input').nth(1).fill(password)
@@ -108,16 +111,16 @@ try {
 
   if (phase === 'all' || phase === 'navigation') {
   await visit('/pages/home/index', '.home-page__content')
-  await step('home-current-task', () => page.locator('.route-card--task').click())
+  await step('home-current-task', () => page.locator('.route-card--task .route-card__open').click())
   await visit('/pages/home/index', '.home-page__content')
-  await page.locator('.task-card__button:not(.is-disabled)').waitFor({ state: 'visible', timeout: 15000 })
+  await page.locator('.task-card__button:not([disabled])').waitFor({ state: 'visible', timeout: 15000 })
   await step('home-primary-action', async () => {
     await page.locator('.task-card__button').click()
     await page.waitForURL(/#\/pages\/waybill\/(detail|cargo-operation|execution-operation)/, { timeout: 10000 })
   })
   await visit('/pages/home/index', '.home-page__content')
-  if (await page.locator('.todo-card__stack .route-card').count()) {
-    await step('home-pending-task', () => page.locator('.todo-card__stack .route-card').first().click())
+  if (await page.locator('.todo-card__stack .route-card__open').count()) {
+    await step('home-pending-task', () => page.locator('.todo-card__stack .route-card__open').first().click())
   }
   await visit('/pages/home/index', '.home-page__content')
   if (await page.locator('.todo-card__all-content').count()) {
@@ -126,7 +129,7 @@ try {
   await visit('/pages/home/index', '.home-page__content')
   await step('home-settings', () => page.locator('[aria-label="打开设置"]').click())
   await visit('/pages/home/index', '.home-page__content')
-  await step('home-navigation', () => page.locator('.route-card__nav .wd-button').first().click())
+  await step('home-navigation', () => page.locator('.route-card__nav').first().click())
   for (const [label, destination] of [
     ['车辆', 'vehicle'],
     ['我的', 'mine'],
@@ -139,24 +142,26 @@ try {
     })
   }
 
-  await visit('/pages/waybill/index', '.waybill-page__stack, .waybill-page__empty')
+  await visit('/pages/waybill/index', listReady)
   for (const group of ['待处理', '进行中', '已完成', '全部']) {
     await step(`waybill-filter-${group}`, async () => {
-      await page.locator('.waybill-page__tab').filter({ hasText: group }).click()
-      await page.waitForSelector('.waybill-page__stack, .waybill-page__empty', { timeout: 20000 })
+      await page.getByRole('group', { name: '运单状态筛选' }).getByRole('button', { name: group, exact: true }).click()
+      await page.getByRole('group', { name: '运单状态筛选' }).getByRole('button', { name: group, exact: true, pressed: true }).waitFor()
+      await page.waitForSelector(listReady, { timeout: 20000 })
     })
   }
   await step('waybill-refresh', async () => {
     await page.locator('[aria-label="刷新运单列表"]').click()
-    await page.waitForSelector('.waybill-page__stack, .waybill-page__empty', { timeout: 20000 })
+    await page.waitForSelector(listReady, { timeout: 20000 })
   })
-  await step('waybill-card-open', () => page.locator('.waybill-page__stack .route-card[role="button"]').first().click())
-  await visit('/pages/waybill/index', '.waybill-page__stack')
-  await step('waybill-expense-open', () => page.locator('.waybill-expense-action uni-button').first().click())
+  await step('waybill-card-open', () => page.locator('.route-card--list .route-card__open').first().click())
+  await visit('/pages/waybill/index', listReady)
+  await step('waybill-expense-open', () => page.getByRole('button', { name: /^上报运单 .+ 的费用$/ }).first().click())
   }
 
   if (phase === 'all' || phase === 'detail') {
-  await visit(`/pages/waybill/detail?id=${encodeURIComponent(waybillId)}`, '.detail-page__content')
+  const detailUrl = `/pages/waybill/detail?id=${encodeURIComponent(waybillId)}`
+  await visit(detailUrl, detailReady)
   await page.evaluate(() => {
     window.__auditApiCalls = { preview: [], navigate: [] }
     const preview = uni.previewImage.bind(uni)
@@ -171,7 +176,7 @@ try {
     }
   })
   const detailControls = await page.evaluate(() =>
-    ['.detail-actions__receipt', '.detail-actions__expense', '.proof-card__image', '.route-card__nav .wd-button']
+    ['.detail-actions .detail-operation', '.route-card--detail .driver-inline', '[aria-label$="张运输单据"]', '.route-card__nav']
       .map(selector => {
         const element = document.querySelector(selector)
         if (!element) return { selector, found: false }
@@ -190,25 +195,29 @@ try {
       }),
   )
   await writeFile(join(output, 'detail-controls.json'), JSON.stringify(detailControls, null, 2))
-  await step('detail-trajectory-tab', () => page.locator('.detail-tabs__item').nth(1).click(), { delay: 900 })
-  await step('detail-tracking-tab', () => page.locator('.detail-tabs__item').nth(0).click())
-  await step('detail-first-proof', () => page.locator('.proof-card__image').first().click())
-  await visit(`/pages/waybill/detail?id=${encodeURIComponent(waybillId)}`, '.proof-card__image')
-  await step('detail-last-proof', () => page.locator('.proof-card__image').last().click())
-  await visit(`/pages/waybill/detail?id=${encodeURIComponent(waybillId)}`, '.detail-page__content')
-  await step('detail-receipt-action', () => page.locator('.detail-actions__receipt').click())
-  await visit(`/pages/waybill/detail?id=${encodeURIComponent(waybillId)}`, '.detail-page__content')
+  await step('detail-trajectory-tab', () => page.getByRole('button', { name: '轨迹定位', exact: true }).click(), { delay: 900 })
+  await step('detail-tracking-tab', () => page.getByRole('button', { name: '运单跟踪', exact: true }).click())
+  await step('detail-first-proof', () => page.locator(detailProof).first().click())
+  await visit(detailUrl, detailProof)
+  await step('detail-last-proof', () => page.locator(detailProof).last().click())
+  await visit(detailUrl, detailReady)
+  await step('detail-receipt-action', async () => {
+    const receipt = page.getByRole('button', { name: '查看运输单据', exact: true })
+    if (await receipt.isVisible()) await receipt.click()
+    else await page.locator(detailProof).first().click()
+  })
+  await visit(detailUrl, detailReady)
   await step('detail-expense-action', async () => {
-    await page.locator('.detail-actions__expense').click()
+    await page.getByRole('button', { name: '费用上报', exact: true }).click()
     await page.waitForURL(/#\/pages\/waybill\/expense/, { timeout: 10000 })
   })
-  await visit(`/pages/waybill/detail?id=${encodeURIComponent(waybillId)}`, '.detail-page__content')
+  await visit(detailUrl, detailReady)
   await step('detail-back', async () => {
     await page.locator('.top-bar__icon[aria-label="返回上一页"]').click()
     await page.waitForURL(/#\/pages\/home\/index/, { timeout: 10000 })
   })
-  await visit(`/pages/waybill/detail?id=${encodeURIComponent(waybillId)}`, '.detail-page__content')
-  await step('detail-navigation', () => page.locator('.route-card__nav .wd-button').click())
+  await visit(detailUrl, detailReady)
+  await step('detail-navigation', () => page.locator('.route-card__nav').click())
   await step('detail-phone-origin', async () => {
     await page.evaluate(() => {
       window.__auditPhoneCount = 0
@@ -240,7 +249,10 @@ try {
     await step(`execution-${action}-preview`, () => page.locator('.tms-evidence-preview').first().click())
     await visit(`/pages/waybill/execution-operation?id=${encodeURIComponent(waybillId)}&action=${action}`, '.execution-page__content')
     await step(`execution-${action}-remove`, () => page.locator('.tms-evidence-remove').first().click())
-    await step(`execution-${action}-required-validation`, () => page.locator('.execution-footer uni-button').click())
+    await step(`execution-${action}-required-validation`, async () => {
+      const submit = page.locator('.execution-footer uni-button')
+      if (!(await submit.isDisabled())) throw new Error('Execution submit must stay disabled without photos')
+    })
   }
 
   await visit(`/pages/waybill/expense?id=${encodeURIComponent(waybillId)}`, '.expense-page__content')
@@ -250,10 +262,10 @@ try {
     await page.locator('.expense-footer uni-button').click()
     await page.waitForSelector('.expense-sheet', { state: 'visible', timeout: 10000 })
   })
-  await step('expense-category-picker', () => page.locator('.expense-field__picker').click())
+  await step('expense-category-picker', () => page.getByRole('button', { name: '选择费用项目', exact: true }).click())
   await step('expense-category-confirm', async () => {
-    await page.locator('.wd-picker__action--confirm:visible').click()
-    const value = await page.locator('.expense-field__picker .wd-cell__value').innerText()
+    await page.getByRole('dialog', { name: '选择费用项目', exact: true }).locator('.mobile-select__option').first().click()
+    const value = await page.locator('.expense-field__picker .mobile-select__control').innerText()
     if (!value || value.includes('请选择')) throw new Error(`Expense category was not selected: ${value}`)
   })
   await visit(`/pages/waybill/expense?id=${encodeURIComponent(waybillId)}`, '.expense-page__content')
@@ -268,13 +280,12 @@ try {
   await visit(`/pages/waybill/expense?id=${encodeURIComponent(waybillId)}`, '.expense-page__content')
   await page.locator('.expense-footer uni-button').click()
   await step('expense-payment-picker', async () => {
-    await page.locator('.expense-field__compact-picker').scrollIntoViewIfNeeded()
-    await page.locator('.expense-field__compact-picker').click()
+    await page.getByRole('button', { name: '选择支付方式', exact: true }).click()
   }, { delay: 1200 })
   await step('expense-payment-confirm', async () => {
-    await page.locator('.wd-picker__action--confirm:visible').click()
-    const value = await page.locator('.expense-field__compact-picker .wd-cell__value').innerText()
-    if (!value || value.includes('请选择')) throw new Error(`Payment method was not selected: ${value}`)
+    await page.getByRole('dialog', { name: '选择支付方式', exact: true }).locator('.mobile-select__option').first().click()
+    const value = await page.locator('.expense-field__compact-picker .mobile-select__control').innerText()
+    if (!value.trim() || value.includes('选填')) throw new Error(`Payment method was not selected: ${value}`)
   })
   await visit(`/pages/waybill/expense?id=${encodeURIComponent(waybillId)}`, '.expense-page__content')
   await page.locator('.expense-footer uni-button').click()
@@ -290,17 +301,17 @@ try {
   await visit('/pages/mine/index', '.mine-page__content')
   await step('mine-refresh', () => page.locator('[aria-label="刷新司机档案"]').click(), { delay: 1200 })
   await step('mine-help-open', async () => {
-    await page.locator('.feature-grid__item').filter({ hasText: '使用说明' }).click()
+    await page.getByRole('button', { name: '使用说明', exact: true }).click()
     await page.locator('.mine-help__panel').waitFor({ state: 'visible' })
   })
   await step('mine-help-close', () => page.locator('.mine-help__done').click())
   await step('mine-expenses', async () => {
-    await page.locator('.feature-grid__item').filter({ hasText: '费用记录' }).click()
+    await page.getByRole('button', { name: '费用记录', exact: true }).click()
     await page.waitForURL(/#\/pages\/waybill\/expense/, { timeout: 15000 })
   })
   await visit('/pages/mine/index', '.mine-page__content')
   await step('mine-receipts', async () => {
-    await page.locator('.feature-grid__item').filter({ hasText: '电子回单' }).click()
+    await page.getByRole('button', { name: '电子回单', exact: true }).click()
     await page.waitForURL(/#\/pages\/waybill\/index\?group=completed/, { timeout: 10000 })
     await page.locator('.waybill-page__stack, .waybill-page__empty').first().waitFor({ state: 'visible', timeout: 15000 })
   })
@@ -308,8 +319,8 @@ try {
   const contactPage = await context.newPage()
   try {
     await contactPage.goto(new URL('#/pages/mine/index', base).href, { waitUntil: 'domcontentloaded' })
-    await contactPage.waitForSelector('.feature-grid__item', { timeout: 15000 })
-    await step('mine-contact-carrier', () => contactPage.locator('.feature-grid__item').filter({ hasText: '联系车队' }).click())
+    await contactPage.getByRole('button', { name: '联系车队', exact: true }).waitFor({ timeout: 15000 })
+    await step('mine-contact-carrier', () => contactPage.getByRole('button', { name: '联系车队', exact: true }).click())
     await contactPage.screenshot({ path: join(output, 'mine-contact-carrier.png') })
   } finally {
     await contactPage.close()

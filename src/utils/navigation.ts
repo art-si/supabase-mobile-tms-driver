@@ -1,4 +1,5 @@
 import type { Waybill } from '@/api/types'
+import { isAndroidApp } from '@mobile-core/platform'
 import { getWaybillRoutePoints, type ValidRoutePoint } from './route'
 
 export function openWaybillNavigation(waybill?: Waybill | null) {
@@ -30,6 +31,7 @@ export function openWaybillNavigation(waybill?: Waybill | null) {
   })
 }
 
+// #ifdef H5
 function openWebMapLocation(name: string, address: string, destination?: ValidRoutePoint) {
   const title = encodeURIComponent(name || address || '目的地')
   const keyword = encodeURIComponent(address || name || '目的地')
@@ -37,9 +39,24 @@ function openWebMapLocation(name: string, address: string, destination?: ValidRo
     ? `https://apis.map.qq.com/uri/v1/routeplan?type=drive&to=${title}&tocoord=${destination.latitude},${destination.longitude}&policy=1&referer=tms-driver`
     : `https://apis.map.qq.com/uri/v1/search?keyword=${keyword}&referer=tms-driver`
 
+  if (isAndroidApp()) {
+    void openAndroidMap(url)
+    return
+  }
   const opened = window.open(url, '_blank')
   if (!opened) window.location.href = url
 }
+
+async function openAndroidMap(url: string) {
+  try {
+    const { Browser } = await import('@capacitor/browser')
+    await Browser.open({ url })
+  } catch {
+    // The bridge can still hand an external top-level navigation to Android.
+    window.location.assign(url)
+  }
+}
+// #endif
 
 function openAddressFallback(name: string, address: string) {
   if (!address) {

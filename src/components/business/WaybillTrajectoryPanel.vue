@@ -3,7 +3,7 @@ import { computed } from "vue";
 import type { Waybill, WaybillEvent } from "@/api/types";
 import { formatDateTime } from "@/utils/format";
 import { getWaybillRoutePoints } from "@/utils/route";
-import TmsIcon from "./TmsIcon.vue";
+import MobileStatusTag from "@mobile-core/components/MobileStatusTag.vue";
 import TmsRouteMap from "./TmsRouteMap.vue";
 
 interface TraceNode {
@@ -131,331 +131,86 @@ const traceDescription = computed(() => {
 });
 </script>
 
-<template>
-  <view class="trajectory-panel card">
-    <view class="trajectory-panel__head">
-      <view>
-        <text class="trajectory-panel__eyebrow">轨迹信息</text>
-        <text class="trajectory-panel__title">节点轨迹与定位</text>
-      </view>
-      <view class="trajectory-panel__count">{{ traceNodes.length }} 个节点</view>
-    </view>
 
-    <view class="trajectory-panel__summary">
-      <view>
-        <strong>{{ measuredNodes.length }}</strong>
-        <text>实测定位</text>
-      </view>
-      <view>
-        <strong>{{ Math.max(0, traceNodes.length - measuredNodes.length) }}</strong>
-        <text>坐标补全</text>
-      </view>
-      <view>
-        <strong>{{ events.length }}</strong>
-        <text>业务记录</text>
-      </view>
+<template>
+  <view class="driver-card trajectory-panel">
+    <view class="driver-heading trajectory-panel__header">
+      <text class="section-title" role="heading" aria-level="2">定位节点</text>
+      <text class="driver-copy">{{ traceNodes.length }} 个节点</text>
     </view>
 
     <view class="trajectory-panel__map">
-      <TmsRouteMap
-        :waybill="waybill"
-        :points-override="mapPoints"
-        route-mode="nodes"
-        embedded
-      />
-      <view v-if="mapRouteAvailable" class="trajectory-panel__legend">
-        <view class="trajectory-panel__legend-item">
-          <view class="trajectory-panel__legend-icon is-route" aria-hidden="true" />
-          <text>车行路线</text>
-        </view>
-        <view class="trajectory-panel__legend-item">
-          <view class="trajectory-panel__legend-icon is-node" aria-hidden="true" />
-          <text>业务节点</text>
-        </view>
-      </view>
+      <TmsRouteMap :waybill="waybill" :points-override="mapPoints" route-mode="nodes" embedded />
     </view>
-
-    <view class="trajectory-panel__notice">
-      <TmsIcon name="location" size="27rpx" />
-      <text>{{ traceDescription }}</text>
+    <view v-if="mapRouteAvailable" class="trajectory-panel__legend" aria-label="地图图例">
+      <text class="trajectory-panel__legend-item trajectory-panel__legend-item--route">车行路线</text>
+      <text class="trajectory-panel__legend-item trajectory-panel__legend-item--node">业务节点</text>
     </view>
+    <text class="driver-copy">{{ traceDescription }}</text>
 
     <view v-if="traceNodes.length" class="trace-list">
-      <view v-for="(node, index) in traceNodes" :key="node.id" class="trace-list__item">
-        <view
-          class="trace-list__index"
-          :class="`is-${node.source}`"
-        >
-          {{ index + 1 }}
+      <view v-for="node in traceNodes" :key="node.id" class="trace-list__item">
+        <view class="driver-heading trace-list__top">
+          <text class="trace-list__title">{{ node.title }}</text>
+          <MobileStatusTag
+            :label="node.source === 'measured' ? '设备定位' : '运单坐标'"
+            :tone="node.source === 'measured' ? 'blue' : 'gray'"
+          />
         </view>
-        <view class="trace-list__main">
-          <view class="trace-list__title-row">
-            <strong>{{ node.title }}</strong>
-            <text>{{ node.source === "measured" ? "设备定位" : "运单坐标" }}</text>
-          </view>
-          <text v-if="node.time" class="trace-list__time">{{ formatDateTime(node.time) }}</text>
-          <text class="trace-list__location">{{ node.location }}</text>
-          <text class="trace-list__coordinate">
-            {{ node.longitude.toFixed(6) }}, {{ node.latitude.toFixed(6) }}
-          </text>
+        <text class="driver-copy">{{ node.location }}</text>
+        <view class="trace-list__meta">
+          <text v-if="node.time">{{ formatDateTime(node.time) }}</text>
+          <text>{{ node.longitude.toFixed(6) }}, {{ node.latitude.toFixed(6) }}</text>
         </view>
       </view>
     </view>
 
-    <view v-else class="trajectory-panel__empty">
-      <TmsIcon name="location" size="48rpx" />
-      <strong>暂无可展示的定位坐标</strong>
-      <text>后续装货、到达等定位打卡会自动汇入这里。</text>
-    </view>
+    <text v-else class="driver-copy">暂无定位坐标，装货或到达打卡后会在这里显示。</text>
   </view>
 </template>
 
 <style scoped lang="scss">
-.trajectory-panel {
-  padding: 28rpx 26rpx 30rpx;
-}
-
-.trajectory-panel__head,
-.trajectory-panel__summary,
-.trajectory-panel__legend,
-.trajectory-panel__notice,
-.trace-list__title-row {
-  display: flex;
-  align-items: center;
-}
-
-.trajectory-panel__head,
-.trace-list__title-row {
-  justify-content: space-between;
-  gap: 18rpx;
-}
-
-.trajectory-panel__eyebrow,
-.trajectory-panel__title {
-  display: block;
-}
-
-.trajectory-panel__eyebrow {
-  color: var(--tms-primary);
-  font-size: max(19rpx, 12px);
-  font-weight: 700;
-  letter-spacing: 2rpx;
-}
-
-.trajectory-panel__title {
-  margin-top: 7rpx;
-  color: var(--tms-text-strong);
-  font-size: 30rpx;
-  font-weight: 700;
-}
-
-.trajectory-panel__count {
-  flex: 0 0 auto;
-  padding: 9rpx 16rpx;
-  color: var(--tms-primary);
-  background: var(--tms-primary-soft);
-  border-radius: 999rpx;
-  font-size: max(21rpx, 12px);
-  font-weight: 700;
-}
-
-.trajectory-panel__summary {
-  gap: 12rpx;
-  margin-top: 24rpx;
-}
-
-.trajectory-panel__summary > view {
-  flex: 1;
-  min-width: 0;
-  padding: 17rpx 12rpx;
-  text-align: center;
-  border: 1rpx solid var(--tms-line-subtle);
-  background: linear-gradient(180deg, var(--tms-surface-soft) 0%, var(--tms-surface-muted) 100%);
-  border-radius: 14rpx;
-}
-
-.trajectory-panel__summary strong,
-.trajectory-panel__summary text {
-  display: block;
-}
-
-.trajectory-panel__summary strong {
-  color: var(--tms-text-strong);
-  font-size: max(28rpx, 12px);
-  font-weight: 700;
-}
-
-.trajectory-panel__summary text {
-  margin-top: 4rpx;
-  color: var(--tms-text-secondary);
-  font-size: max(19rpx, 12px);
-}
-
+.trajectory-panel { display: grid; min-width: 0; gap: 10px; }
+.trajectory-panel__header { flex-wrap: wrap; }
 .trajectory-panel__map {
   position: relative;
-  margin-top: 20rpx;
   overflow: hidden;
-  border: 1rpx solid var(--tms-line);
-  border-radius: 20rpx;
-  background: #e8eef5;
-  box-shadow: 0 10rpx 28rpx rgba(31, 42, 68, 0.07);
+  border: 1px solid var(--mobile-workspace-line);
+  border-radius: 14px;
+  background: var(--tms-surface-soft);
 }
-
 .trajectory-panel__legend {
-  position: absolute;
-  right: 14rpx;
-  bottom: 14rpx;
-  z-index: 4;
-  gap: 14rpx;
-  padding: 9rpx 13rpx;
-  color: var(--tms-muted);
-  background: rgba(255, 255, 255, 0.94);
-  border-radius: 999rpx;
-  font-size: max(22rpx, 12px);
-  box-shadow: 0 6rpx 18rpx rgba(31, 41, 55, 0.1);
-}
-
-.trajectory-panel__legend-item {
   display: flex;
-  align-items: center;
-  gap: 6rpx;
-  white-space: nowrap;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  color: var(--mobile-workspace-muted);
+  font-size: 12px;
 }
-
-.trajectory-panel__legend-icon {
-  box-sizing: border-box;
-  flex: 0 0 auto;
-  display: block;
-  width: 16rpx;
-  height: 16rpx;
+.trajectory-panel__legend-item { display: flex; align-items: center; gap: 5px; }
+.trajectory-panel__legend-item::before { content: ''; display: inline-block; }
+.trajectory-panel__legend-item--route::before {
+  width: 12px;
+  height: 3px;
+  border-radius: 8px;
+  background: var(--mobile-workspace-accent);
 }
-
-.trajectory-panel__legend .is-route {
-  width: 22rpx;
-  height: 6rpx;
-  border-radius: 999rpx;
-  background: var(--tms-primary);
-}
-
-.trajectory-panel__legend .is-node {
-  border: 3rpx solid var(--tms-primary);
+.trajectory-panel__legend-item--node::before {
+  width: 7px;
+  height: 7px;
+  border: 2px solid var(--mobile-workspace-accent);
   border-radius: 50%;
-  background: #fff;
 }
-
-.trajectory-panel__notice {
-  align-items: flex-start;
-  gap: 10rpx;
-  margin-top: 18rpx;
-  padding: 16rpx 18rpx;
-  color: var(--tms-info);
-  background: var(--tms-primary-soft);
-  border-left: 5rpx solid var(--tms-primary);
-  border-radius: 13rpx;
-  font-size: max(20rpx, 12px);
-  line-height: 1.55;
-}
-
-.trace-list {
-  margin-top: 22rpx;
-}
-
+.trace-list { display: grid; }
 .trace-list__item {
-  position: relative;
-  display: flex;
-  gap: 16rpx;
-  padding-bottom: 24rpx;
-}
-
-.trace-list__item:not(:last-child)::before {
-  position: absolute;
-  top: 42rpx;
-  bottom: 2rpx;
-  left: 19rpx;
-  width: 2rpx;
-  content: "";
-  background: var(--tms-line);
-}
-
-.trace-list__index {
-  position: relative;
-  z-index: 1;
-  box-sizing: border-box;
-  flex: 0 0 40rpx;
-  width: 40rpx;
-  min-width: 40rpx;
-  height: 40rpx;
-  min-height: 40rpx;
-  aspect-ratio: 1;
-  border: 4rpx solid #fff;
-  border-radius: 50%;
-  color: #fff;
-  background: var(--tms-primary);
-  font-size: max(18rpx, 12px);
-  font-weight: 700;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 5rpx 14rpx rgba(var(--tms-primary-rgb), 0.2);
-}
-
-.trace-list__index.is-inferred {
-  background: var(--tms-orange);
-}
-
-.trace-list__main {
+  display: grid;
   min-width: 0;
-  flex: 1;
-  padding: 2rpx 0;
-}
-
-.trace-list__title-row strong {
-  min-width: 0;
-  color: var(--tms-text-strong);
-  font-size: max(24rpx, 12px);
+  gap: 4px;
+  padding-block: 9px;
+  border-top: 1px solid var(--mobile-workspace-line);
   overflow-wrap: anywhere;
 }
-
-.trace-list__title-row text {
-  flex: 0 0 auto;
-  color: var(--tms-muted);
-  font-size: max(19rpx, 12px);
-}
-
-.trace-list__time,
-.trace-list__location,
-.trace-list__coordinate {
-  display: block;
-  margin-top: 6rpx;
-  color: var(--tms-text-secondary);
-  font-size: max(20rpx, 12px);
-  line-height: 1.45;
-  overflow-wrap: anywhere;
-}
-
-.trace-list__coordinate {
-  color: var(--tms-light);
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: max(18rpx, 12px);
-}
-
-.trajectory-panel__empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8rpx;
-  padding: 54rpx 20rpx 26rpx;
-  color: var(--tms-light);
-  text-align: center;
-}
-
-.trajectory-panel__empty strong {
-  color: var(--tms-muted);
-  font-size: max(24rpx, 12px);
-}
-
-.trajectory-panel__empty text {
-  font-size: max(20rpx, 12px);
-}
+.trace-list__item:last-child { padding-bottom: 0; }
+.trace-list__top { flex-wrap: wrap; }
+.trace-list__title { color: var(--mobile-workspace-ink); font-size: 14px; font-weight: 700; }
+.trace-list__meta { display: flex; flex-wrap: wrap; gap: 2px 9px; color: var(--mobile-workspace-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 </style>

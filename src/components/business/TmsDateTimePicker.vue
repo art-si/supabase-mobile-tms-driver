@@ -57,8 +57,7 @@ function confirm() {
   <wd-popup
     v-model="popupVisible"
     position="bottom"
-    safe-area-inset-bottom
-    custom-style="border-radius: 28rpx 28rpx 0 0; overflow: hidden;"
+    custom-style="border-radius: 28rpx 28rpx 0 0; overflow: hidden; padding-bottom: var(--mobile-safe-bottom, 0px);"
   >
     <view class="datetime-sheet">
       <view class="datetime-sheet__header">
@@ -194,7 +193,7 @@ function confirm() {
   font-weight: 700;
 }
 .datetime-sheet__footer {
-  padding: 20rpx 30rpx calc(20rpx + env(safe-area-inset-bottom));
+  padding: 20rpx 30rpx;
   display: grid;
   grid-template-columns: 1fr 1.7fr;
   gap: 16rpx;

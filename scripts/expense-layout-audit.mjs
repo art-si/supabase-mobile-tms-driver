@@ -32,9 +32,9 @@ try {
   await page.waitForTimeout(200)
   const topScreenshot = resolve(output, `${width}-expense-controls.png`)
   await page.screenshot({ path: topScreenshot })
-  const selectorMeasurements = await page.locator('.expense-field__picker, .expense-field--split .tms-date-trigger').evaluateAll(elements => elements.map(element => {
+  const selectorMeasurements = await page.locator('.expense-field__picker .mobile-select__control, .expense-field--split .tms-date-trigger').evaluateAll(elements => elements.map(element => {
     const rect = element.getBoundingClientRect()
-    const arrow = element.querySelector('.wd-cell__arrow-right')?.getBoundingClientRect()
+    const arrow = element.querySelector('.mobile-select__chevron, .wd-cell__arrow-right')?.getBoundingClientRect()
     return {
       className: element.className,
       x: rect.x, y: rect.y, width: rect.width, height: rect.height,
@@ -54,7 +54,7 @@ try {
   await page.waitForTimeout(400)
   const screenshot = resolve(output, `${width}-expense-supplemental.png`)
   await page.screenshot({ path: screenshot })
-  const measurements = await page.locator('.expense-field__input-grid uni-label, .expense-field__input-grid .wd-input, .expense-field__input-grid .wd-cell, .expense-field__input-grid .wd-cell__arrow-right, .expense-field__input-grid .wd-cell__value, .expense-field__location-row').evaluateAll(elements => elements.map(element => {
+  const measurements = await page.locator('.expense-field__input-grid .mobile-field__control, .expense-field__input-grid .mobile-select__control, #expense-location').evaluateAll(elements => elements.map(element => {
     const rect = element.getBoundingClientRect()
     const style = getComputedStyle(element)
     return {
@@ -68,7 +68,7 @@ try {
       display: style.display,
     }
   }))
-  const formControlHeights = measurements.filter(item => item.className.includes('tms-form-input--small') || item.className.includes('tms-select-trigger--small') || item.className === 'expense-field__location-row').map(item => item.height)
+  const formControlHeights = measurements.map(item => item.height)
   const heightDelta = Math.max(...formControlHeights) - Math.min(...formControlHeights)
   const arrowsRightAligned = selectorMeasurements.every(item => item.arrowRightInset !== null && item.arrowRightInset <= 18 && item.arrowCenterOffset !== null && item.arrowCenterOffset <= 2)
   const report = { screenshot, topScreenshot, datePickerScreenshot, dateBefore, dateAfter, heightDelta, arrowsRightAligned, selectorMeasurements, measurements }

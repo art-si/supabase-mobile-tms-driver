@@ -7,6 +7,7 @@ import type {
 } from "@/api/types";
 import { formatDateTime, formatMoney } from "@/utils/format";
 import TmsIcon from './TmsIcon.vue'
+import MobileEvidence from '@mobile-core/components/MobileEvidence.vue'
 
 type TimelineTone = "blue" | "green" | "orange" | "red" | "gray";
 
@@ -311,438 +312,100 @@ function preview(item: TimelineItem, index: number) {
 }
 </script>
 
-<template>
-  <view class="tracking-card card">
-    <view class="tracking-card__head">
-      <view>
-        <text class="section-eyebrow">运单跟踪</text>
-        <text class="section-title">全流程记录</text>
-      </view>
-      <view class="tracking-card__count">
-        <strong>{{ timeline.length }}</strong>
-        <text>条记录</text>
-      </view>
-    </view>
 
-    <view class="tracking-card__summary">
-      <TmsIcon name="success" size="28rpx" />
-      <text>已记录 {{ completedKeyActionCount }}/{{ keyActionTotal }} 个关键节点，费用与补录记录按提交时间同步展示</text>
+<template>
+  <view class="driver-card tracking-card">
+    <view class="driver-heading tracking-card__head">
+      <text class="section-title" role="heading" aria-level="2">运单记录</text>
+      <text v-if="timeline.length" class="driver-copy">{{ completedKeyActionCount }}/{{ keyActionTotal }} 个关键节点</text>
     </view>
-    <view v-if="syncWarning" class="tracking-card__warning">
-      <TmsIcon name="warning" size="28rpx" />
+    <view v-if="syncWarning" class="tracking-card__warning" role="status">
+      <TmsIcon name="warning" size="26rpx" aria-hidden="true" />
       <text>{{ syncWarning }}</text>
     </view>
 
     <view v-if="timeline.length" class="tracking-list">
-      <view
-        v-for="(item, index) in timeline"
-        :key="item.id"
-        class="tracking-item"
-        :class="`tracking-item--${item.tone}`"
-      >
-        <view class="tracking-item__rail" aria-hidden="true">
-          <view class="tracking-item__dot">
-            <TmsIcon
-              :name="item.tone === 'green' ? 'check' : item.tone === 'red' ? 'close' : 'time'"
-              size="20rpx"
-            />
-          </view>
-          <view v-if="index < timeline.length - 1" class="tracking-item__line" />
-        </view>
-
+      <view v-for="item in timeline" :key="item.id" class="tracking-item" :class="'tracking-item--' + item.tone">
+        <view class="tracking-item__rail" aria-hidden="true"><view class="tracking-item__dot" /></view>
         <view class="tracking-item__content">
-          <view class="tracking-item__time-row">
+          <text class="tracking-item__title">{{ item.title }}</text>
+          <view class="tracking-item__meta">
             <text>{{ formatDateTime(item.eventTime) }}</text>
-            <text class="tracking-item__source">{{ item.source }}</text>
+            <text>{{ item.source }}</text>
+            <text v-if="item.operator">{{ item.operator }}</text>
           </view>
-          <view class="tracking-item__panel">
-            <view class="tracking-item__title-row">
-              <strong>{{ item.title }}</strong>
-              <text v-if="item.operator" class="tracking-item__operator">{{ item.operator }}</text>
-            </view>
-            <text class="tracking-item__description">{{ item.description }}</text>
+          <text class="driver-copy">{{ item.description }}</text>
 
-            <view v-if="item.metrics.length" class="tracking-item__metrics">
-              <text v-for="metric in item.metrics" :key="metric">{{ metric }}</text>
-            </view>
-
-            <view v-if="item.location" class="tracking-item__detail">
-              <TmsIcon name="location" size="24rpx" />
-              <text>{{ item.location }}</text>
-            </view>
-            <view v-if="item.remark" class="tracking-item__remark">
-              <text>备注</text>
-              <strong>{{ item.remark }}</strong>
-            </view>
-
-            <view v-if="item.attachments.length" class="tracking-item__images">
-              <button
-                v-for="(url, imageIndex) in item.attachments.slice(0, 3)"
-                :key="url"
-                :aria-label="`查看${item.title}第 ${imageIndex + 1} 张凭证`"
-                @click="preview(item, imageIndex)"
-              >
-                <image :src="url" mode="aspectFill" lazy-load />
-                <text v-if="imageIndex === 2 && item.attachments.length > 3">
-                  +{{ item.attachments.length - 3 }}
-                </text>
-              </button>
-            </view>
-
-            <text v-if="shouldShowRecordedAt(item)" class="tracking-item__recorded">
-              系统记录于 {{ formatDateTime(item.recordedAt) }}
-            </text>
+          <view v-if="item.metrics.length" class="tracking-item__meta">
+            <text v-for="metric in item.metrics" :key="metric">{{ metric }}</text>
           </view>
+          <text v-if="item.location" class="driver-copy">{{ item.location }}</text>
+          <text v-if="item.remark" class="driver-copy">备注 · {{ item.remark }}</text>
+
+          <view v-if="item.attachments.length" class="tracking-item__evidence">
+            <MobileEvidence
+              readonly :images="item.attachments.slice(0, 3)" :label="item.title + '凭证'"
+              @preview="preview(item, $event)"
+            />
+            <text v-if="item.attachments.length > 3" class="driver-copy">共 {{ item.attachments.length }} 张凭证</text>
+          </view>
+          <text v-if="shouldShowRecordedAt(item)" class="driver-copy">系统记录于 {{ formatDateTime(item.recordedAt) }}</text>
         </view>
       </view>
     </view>
-    <view v-else class="tracking-card__empty">
-      <TmsIcon name="time" size="40rpx" />
-      <strong>暂无跟踪记录</strong>
-      <text>完成运输节点后，操作时间与资料摘要会显示在这里</text>
-    </view>
+    <text v-else class="driver-copy">完成运输节点后，操作时间和资料会显示在这里。</text>
   </view>
 </template>
 
 <style scoped lang="scss">
-.tracking-card {
-  padding: 30rpx 28rpx 14rpx;
-}
-
-.tracking-card__head,
-.tracking-item__time-row,
-.tracking-item__title-row {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16rpx;
-}
-
-.tracking-card__count {
-  flex: 0 0 auto;
-  color: var(--tms-muted);
-  display: flex;
-  align-items: baseline;
-  gap: 6rpx;
-  font-size: max(21rpx, 12px);
-}
-
-.tracking-card__count strong {
-  color: var(--tms-primary);
-  font-size: 32rpx;
-  font-variant-numeric: tabular-nums;
-}
-
-.tracking-card__summary {
-  margin-top: 22rpx;
-  padding: 16rpx 18rpx;
-  border-radius: 16rpx;
-  color: var(--tms-info);
-  background: var(--tms-info-soft);
+.tracking-card { display: grid; gap: 12px; }
+.tracking-card__head { flex-wrap: wrap; }
+.tracking-card__warning {
   display: flex;
   align-items: flex-start;
-  gap: 10rpx;
-  font-size: max(22rpx, 12px);
-  font-weight: 600;
-  line-height: 1.5;
-}
-
-.tracking-card__summary text {
-  min-width: 0;
-  flex: 1;
-}
-
-.tracking-card__warning {
-  margin-top: 12rpx;
-  padding: 15rpx 18rpx;
-  border-radius: 14rpx;
+  gap: 7px;
+  padding: 8px 10px;
+  border-radius: 10px;
   color: var(--tms-orange-strong);
   background: var(--tms-orange-soft);
-  display: flex;
-  align-items: flex-start;
-  gap: 10rpx;
-  font-size: max(21rpx, 12px);
-  font-weight: 600;
-  line-height: 1.45;
+  font-size: 13px;
+  line-height: 1.4;
 }
-
-.tracking-card__warning text {
-  min-width: 0;
-  flex: 1;
+.tracking-list { display: grid; }
+.tracking-item { display: grid; grid-template-columns: 10px minmax(0, 1fr); gap: 8px; }
+.tracking-item__rail { position: relative; display: flex; justify-content: center; }
+.tracking-item:not(:last-child) .tracking-item__rail::after {
+  position: absolute;
+  z-index: 0;
+  inset-block: 10px -10px;
+  width: 1px;
+  background: var(--mobile-workspace-line);
+  content: '';
 }
-
-.tracking-list {
-  margin-top: 26rpx;
-}
-
-.tracking-item {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: 44rpx minmax(0, 1fr);
-  gap: 16rpx;
-}
-
-.tracking-item__rail {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
 .tracking-item__dot {
   position: relative;
   z-index: 1;
-  box-sizing: border-box;
-  flex: 0 0 40rpx;
-  width: 40rpx;
-  min-width: 40rpx;
-  height: 40rpx;
-  min-height: 40rpx;
-  aspect-ratio: 1;
-  border: 4rpx solid var(--tms-primary-soft);
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
   border-radius: 50%;
-  color: #fff;
-  background: var(--tms-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: var(--mobile-workspace-accent);
 }
-
-.tracking-item__dot :deep(.tms-icon) {
-  box-sizing: border-box;
-  flex: 0 0 20rpx;
-  width: 20rpx;
-  min-width: 20rpx;
-  height: 20rpx;
-  min-height: 20rpx;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1 !important;
-}
-
-.tracking-item--green .tracking-item__dot {
-  border-color: var(--tms-green-soft);
-  background: var(--tms-green);
-}
-
-.tracking-item--orange .tracking-item__dot {
-  border-color: var(--tms-orange-soft);
-  background: var(--tms-orange);
-}
-
-.tracking-item--red .tracking-item__dot {
-  border-color: var(--tms-red-soft);
-  background: var(--tms-red);
-}
-
-.tracking-item--gray .tracking-item__dot {
-  border-color: var(--tms-line-subtle);
-  color: #fff;
-  background: #8b97aa;
-}
-
-.tracking-item__line {
-  width: 2rpx;
-  min-height: 100%;
-  flex: 1;
-  background: linear-gradient(#d8e0ed 0%, var(--tms-line) 100%);
-}
-
-.tracking-item__content {
-  min-width: 0;
-  padding-bottom: 28rpx;
-}
-
-.tracking-item__time-row {
-  min-height: 40rpx;
-  color: var(--tms-muted);
-  font-size: max(22rpx, 12px);
-  font-variant-numeric: tabular-nums;
-}
-
-.tracking-item__source {
-  flex: 0 0 auto;
-  padding: 5rpx 12rpx;
-  border-radius: 999rpx;
-  color: var(--tms-primary);
-  background: var(--tms-primary-soft);
-  font-size: max(19rpx, 12px);
-  font-weight: 700;
-}
-
-.tracking-item__panel {
-  min-width: 0;
-  margin-top: 10rpx;
-  padding: 22rpx;
-  border: 1rpx solid var(--tms-line);
-  border-radius: 20rpx;
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
-  box-shadow: 0 8rpx 22rpx rgba(31, 42, 68, 0.035);
-}
-
-.tracking-item__title-row {
-  align-items: flex-start;
-}
-
-.tracking-item__title-row strong {
-  min-width: 0;
-  color: var(--tms-text);
-  font-size: max(27rpx, 12px);
-  font-weight: 700;
-  line-height: 1.35;
-}
-
-.tracking-item__operator {
-  max-width: 180rpx;
-  overflow: hidden;
-  color: var(--tms-muted);
-  font-size: max(21rpx, 12px);
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tracking-item__description {
-  display: block;
-  margin-top: 8rpx;
-  color: var(--tms-muted);
-  font-size: max(22rpx, 12px);
-  line-height: 1.5;
-}
-
-.tracking-item__metrics {
-  margin-top: 14rpx;
+.tracking-item--green .tracking-item__dot { background: var(--tms-green-strong); }
+.tracking-item--orange .tracking-item__dot { background: var(--tms-orange-strong); }
+.tracking-item--red .tracking-item__dot { background: var(--tms-red-strong); }
+.tracking-item--gray .tracking-item__dot { background: var(--mobile-workspace-muted); }
+.tracking-item__content { display: grid; min-width: 0; gap: 4px; padding-bottom: 16px; overflow-wrap: anywhere; }
+.tracking-item:last-child .tracking-item__content { padding-bottom: 0; }
+.tracking-item__title { color: var(--mobile-workspace-ink); font-size: 15px; font-weight: 690; line-height: 1.35; }
+.tracking-item__meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8rpx;
-}
-
-.tracking-item__metrics text {
-  padding: 7rpx 12rpx;
-  border-radius: 10rpx;
-  color: #46546b;
-  background: #f0f3f8;
-  font-size: max(20rpx, 12px);
-  font-weight: 600;
-  line-height: 1.25;
+  gap: 2px 10px;
+  color: var(--mobile-workspace-muted);
+  font-size: 12px;
+  line-height: 1.4;
   font-variant-numeric: tabular-nums;
 }
-
-.tracking-item__detail {
-  min-width: 0;
-  margin-top: 15rpx;
-  color: #66738a;
-  display: flex;
-  align-items: flex-start;
-  gap: 8rpx;
-  font-size: max(21rpx, 12px);
-  line-height: 1.5;
-}
-
-.tracking-item__detail text {
-  min-width: 0;
-  flex: 1;
-  word-break: break-word;
-}
-
-.tracking-item__remark {
-  min-width: 0;
-  margin-top: 14rpx;
-  padding: 12rpx 14rpx;
-  border-left: 5rpx solid #f0a12c;
-  border-radius: 8rpx;
-  color: #76531e;
-  background: #fff7e8;
-  display: flex;
-  align-items: flex-start;
-  gap: 10rpx;
-  font-size: max(21rpx, 12px);
-  line-height: 1.45;
-}
-
-.tracking-item__remark text {
-  flex: 0 0 auto;
-  font-weight: 700;
-}
-
-.tracking-item__remark strong {
-  min-width: 0;
-  font-weight: 600;
-  word-break: break-word;
-}
-
-.tracking-item__images {
-  margin-top: 16rpx;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10rpx;
-}
-
-.tracking-item__images button {
-  position: relative;
-  width: 100%;
-  height: 126rpx;
-  min-height: 88rpx;
-  padding: 0;
-  overflow: hidden;
-  border: 0;
-  border-radius: 14rpx;
-  background: #edf1f7;
-}
-
-.tracking-item__images button::after {
-  display: none;
-}
-
-.tracking-item__images image {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-.tracking-item__images button > text {
-  position: absolute;
-  inset: 0;
-  color: #fff;
-  background: rgba(21, 32, 51, 0.58);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: max(26rpx, 12px);
-  font-weight: 700;
-}
-
-.tracking-item__recorded {
-  display: block;
-  margin-top: 15rpx;
-  padding-top: 13rpx;
-  border-top: 1rpx dashed #dfe5ee;
-  color: #8a95a7;
-  font-size: max(20rpx, 12px);
-  font-variant-numeric: tabular-nums;
-}
-
-.tracking-card__empty {
-  min-height: 230rpx;
-  color: var(--tms-muted);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10rpx;
-  text-align: center;
-}
-
-.tracking-card__empty strong {
-  color: var(--tms-text);
-  font-size: max(26rpx, 12px);
-}
-
-.tracking-card__empty text {
-  max-width: 470rpx;
-  font-size: max(22rpx, 12px);
-  line-height: 1.5;
-}
+.tracking-item__evidence { display: grid; gap: 4px; margin-block: 4px; }
 </style>

@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import MobileWorkspace from '@mobile-core/components/MobileWorkspace.vue'
 import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import TmsBottomNav from '@/components/business/TmsBottomNav.vue'
 import TmsIcon from '@/components/business/TmsIcon.vue'
-import MobileMetricGrid from '@mobile-core/components/MobileMetricGrid.vue'
+import MobileAction from '@mobile-core/components/MobileAction.vue'
 import TmsPageSkeleton from '@mobile-core/components/TmsPageSkeleton.vue'
 import MobileTopBar from '@mobile-core/components/MobileTopBar.vue'
 import TmsVehicleVisual from '@/components/business/TmsVehicleVisual.vue'
@@ -24,18 +25,6 @@ const loadError = ref('')
 const showSkeleton = computed(() => !profile.summary && (initialLoading.value || Boolean(loadError.value)))
 const approvedLoadTon = computed(() => normalizeVehicleLoadTon(vehicle.value?.approvedLoadMass))
 
-const metrics = computed(() => [
-  {
-    label: '载重',
-    value: approvedLoadTon.value ?? '--',
-    unit: approvedLoadTon.value === undefined ? '' : '吨'
-  },
-  {
-    label: '车长',
-    value: vehicle.value?.overallLength ? formatMeters(vehicle.value.overallLength) : '--'
-  },
-  { label: '车况', value: vehicleStatusLabel.value }
-])
 const vehicleTypeLabel = computed(() => dictionary.label('vehicleType', vehicle.value?.vehicleType))
 const fuelTypeLabel = computed(() => dictionary.label('vehicleFuelType', vehicle.value?.fuelType))
 const vehicleStatusLabel = computed(() =>
@@ -50,6 +39,26 @@ const auditStatusLabel = computed(() =>
   } as Record<string, string>)[vehicle.value?.auditStatus || ''] ||
   '待审核'
 )
+
+const vehicleDescription = computed(() => {
+  const type = vehicleTypeLabel.value === '--' ? '' : vehicleTypeLabel.value
+  return [type, vehicle.value?.brandModel].filter(Boolean).join(' · ')
+})
+
+const vehicleFacts = computed(() => [
+  {
+    label: '载重',
+    value: approvedLoadTon.value === undefined ? '--' : `${approvedLoadTon.value} 吨`
+  },
+  { label: '车长', value: vehicle.value?.overallLength ? formatMeters(vehicle.value.overallLength) : '--' },
+  { label: '燃料类型', value: fuelTypeLabel.value },
+  { label: '运营状态', value: vehicleStatusLabel.value },
+  { label: '审核状态', value: auditStatusLabel.value }
+])
+const vehicleDocuments = computed(() => [
+  { label: '行驶证', icon: 'document', url: vehicle.value?.drivingLicenseFrontUrl },
+  { label: '运输证', icon: 'receipt', url: vehicle.value?.operationLicenseUrl }
+] as const)
 
 onShow(() => {
   void load()
@@ -80,378 +89,99 @@ function preview(url?: string) {
 </script>
 
 <template>
-<wd-config-provider :theme="themeName">
-  <view class="vehicle-page page safe-bottom">
-    <MobileTopBar title="车辆中心" eyebrow="车辆档案" subtitle="查看绑定车辆与证件状态" />
+  <wd-config-provider :theme="themeName">
+    <MobileWorkspace class="page driver-page">
+      <MobileTopBar title="车辆" capsule="always" />
+      <view class="driver-content driver-content--tabbed">
+        <TmsPageSkeleton
+          v-if="showSkeleton"
+          label="正在同步车辆档案…"
+          :error="loadError"
+          @retry="load"
+        />
+        <template v-else>
+          <view v-if="loadError" class="driver-card driver-heading vehicle-sync-error" role="alert">
+            <text class="driver-error">档案同步失败，当前显示上次的信息</text>
+            <MobileAction class="driver-inline" :disabled="syncing" @click="load">重试</MobileAction>
+          </view>
 
-    <scroll-view scroll-y class="vehicle-page__scroll">
-    <TmsPageSkeleton
-      v-if="showSkeleton"
-      label="正在同步车辆档案…"
-      :error="loadError"
-      @retry="load"
-    />
-    <view v-else class="vehicle-page__content">
-      <view v-if="loadError" class="vehicle-page__sync-error" role="alert">
-        <text>档案同步失败，当前显示上次的信息</text>
-        <button @tap="load">重试</button>
-      </view>
-      <view class="vehicle-card card">
-        <view class="vehicle-card__eyebrow">
-          <text>当前绑定车辆</text>
-          <text>档案同步</text>
-        </view>
-        <view class="vehicle-card__body">
-          <TmsVehicleVisual
-            class="vehicle-card__image"
-            :photo-url="vehicle?.vehiclePhotoUrl"
-          />
-          <view class="vehicle-card__info">
-            <view class="vehicle-card__plate-row">
-              <text class="vehicle-card__plate">{{ vehicle?.plateNo || '暂无车辆' }}</text>
-              <text class="vehicle-card__tag"><text />{{ vehicleStatusLabel }}</text>
+          <template v-if="vehicle">
+            <view class="driver-card vehicle-card">
+              <TmsVehicleVisual class="vehicle-card__image" height="72px" :photo-url="vehicle.vehiclePhotoUrl" />
+              <view class="mobile-row__body">
+                <text class="vehicle-card__plate">{{ vehicle.plateNo || '车牌待登记' }}</text>
+                <text v-if="vehicleDescription" class="mobile-row__detail">{{ vehicleDescription }}</text>
+              </view>
             </view>
-            <text class="vehicle-card__model">
-              {{ vehicleTypeLabel }} · {{ vehicle?.brandModel || '--' }}
-            </text>
-          </view>
-        </view>
-        <MobileMetricGrid :items="metrics" />
-      </view>
 
-      <view class="status-card card">
-        <view class="section-head">
-          <view>
-            <text class="section-eyebrow">运营信息</text>
-            <text class="section-title">车辆状态</text>
-          </view>
-          <text class="section-head__hint">实时档案</text>
-        </view>
-        <view class="status-card__row">
-          <text>燃料类型</text>
-          <text>{{ fuelTypeLabel }}</text>
-        </view>
-        <view class="status-card__row">
-          <text>运营状态</text>
-          <text>{{ vehicleStatusLabel }}</text>
-        </view>
-        <view class="status-card__row">
-          <text>审核状态</text>
-          <text>{{ auditStatusLabel }}</text>
-        </view>
-      </view>
-
-      <view class="doc-card card">
-        <view class="section-head">
-          <view>
-            <text class="section-eyebrow">证件管理</text>
-            <text class="section-title">证件信息</text>
-          </view>
-          <text class="section-head__hint">点击预览</text>
-        </view>
-        <view class="doc-card__grid">
-          <button
-            class="doc-card__item"
-            aria-label="预览行驶证"
-            hover-class="doc-card__item--pressed"
-            @tap="preview(vehicle?.drivingLicenseFrontUrl)"
-          >
-            <view class="doc-card__icon"><TmsIcon name="document" size="46rpx" /></view>
             <view>
-              <text class="doc-card__name">行驶证</text>
-              <text class="doc-card__status">{{ vehicle?.drivingLicenseFrontUrl ? '已上传' : '待上传' }}</text>
+              <text class="mobile-group-title" role="heading" aria-level="2">车辆信息</text>
+              <view class="mobile-group vehicle-specs">
+                <view v-for="fact in vehicleFacts" :key="fact.label" class="mobile-row mobile-row--static">
+                  <view class="mobile-row__body"><text class="mobile-row__label">{{ fact.label }}</text></view>
+                  <text class="mobile-row__trailing mobile-row__detail mobile-row__value">{{ fact.value }}</text>
+                </view>
+              </view>
             </view>
-            <TmsIcon name="arrow-right" size="28rpx" />
-          </button>
-          <button
-            class="doc-card__item"
-            aria-label="预览运输证"
-            hover-class="doc-card__item--pressed"
-            @tap="preview(vehicle?.operationLicenseUrl)"
-          >
-            <view class="doc-card__icon"><TmsIcon name="receipt" size="46rpx" /></view>
-            <view>
-              <text class="doc-card__name">运输证</text>
-              <text class="doc-card__status">{{ vehicle?.operationLicenseUrl ? '已上传' : '待上传' }}</text>
-            </view>
-            <TmsIcon name="arrow-right" size="28rpx" />
-          </button>
-        </view>
-      </view>
-    </view>
-    </scroll-view>
 
-    <TmsBottomNav active="vehicle" />
-  </view>
-</wd-config-provider>
+            <view>
+              <text class="mobile-group-title" role="heading" aria-level="2">证件</text>
+              <view class="mobile-group">
+                <MobileAction
+                  v-for="document in vehicleDocuments"
+                  :key="document.icon"
+                  class="mobile-row"
+                  :aria-label="`预览${document.label}`"
+                  @click="preview(document.url)"
+                >
+                  <view class="mobile-row__icon" aria-hidden="true">
+                    <TmsIcon :name="document.icon" size="17px" />
+                  </view>
+                  <view class="mobile-row__body"><text class="mobile-row__label">{{ document.label }}</text></view>
+                  <text class="mobile-row__trailing mobile-row__detail">{{ document.url ? '已上传' : '待上传' }}</text>
+                  <TmsIcon class="mobile-row__chevron" name="chevron" size="14px" aria-hidden="true" />
+                </MobileAction>
+              </view>
+            </view>
+          </template>
+
+          <view v-else class="driver-card driver-empty">
+            <view class="driver-empty__icon" aria-hidden="true"><TmsIcon name="vehicle" size="22px" /></view>
+            <text class="section-title" role="heading" aria-level="2">暂无绑定车辆</text>
+            <text class="driver-copy">绑定车辆后可查看档案与证件。</text>
+          </view>
+        </template>
+      </view>
+      <TmsBottomNav active="vehicle" />
+    </MobileWorkspace>
+  </wd-config-provider>
 </template>
 
 <style scoped lang="scss">
-.vehicle-page {
-  height: 100vh;
-  height: 100dvh;
-  padding-bottom: var(--tms-tabbar-space);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.vehicle-page__scroll {
-  flex: 1;
-  min-height: 0;
-  height: auto;
-}
-
-.vehicle-page__content {
-  padding: 24rpx 28rpx 32rpx;
-  display: flex;
-  flex-direction: column;
-  gap: 24rpx;
-}
-
-.vehicle-page__sync-error {
-  min-width: 0;
-  padding: 16rpx 20rpx;
-  border: 1rpx solid rgba(234, 138, 20, 0.28);
-  border-radius: var(--tms-radius-md);
-  color: var(--tms-orange-strong);
-  background: var(--tms-orange-soft);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16rpx;
-  font-size: max(22rpx, 12px);
-  line-height: 1.4;
-}
-
-.vehicle-page__sync-error text {
-  min-width: 0;
-}
-
-.vehicle-page__sync-error button {
-  flex: 0 0 auto;
-  min-width: 88rpx;
-  height: 88rpx;
-  margin: 0;
-  padding: 0 12rpx;
-  border: 0;
-  color: var(--tms-primary);
-  background: transparent;
-  font-size: max(23rpx, 12px);
-  font-weight: 700;
-  line-height: 88rpx;
-}
-
-.vehicle-card,
-.status-card,
-.doc-card {
-  padding: 30rpx;
-}
-
 .vehicle-card {
-  background:
-    radial-gradient(circle at 92% 0, rgba(var(--tms-primary-rgb), 0.1), transparent 220rpx),
-    #fff;
-  box-shadow: var(--tms-shadow-md);
-}
-
-.vehicle-card__eyebrow {
-  margin-bottom: 24rpx;
-  color: #748096;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20rpx;
-  font-size: max(20rpx, 12px);
-  font-weight: 700;
-}
-
-.vehicle-card__eyebrow text:last-child {
-  color: var(--tms-primary);
-}
-
-.vehicle-card__body {
-  margin-bottom: 28rpx;
   display: grid;
-  grid-template-columns: 116rpx minmax(0, 1fr);
+  grid-template-columns: 88px minmax(0, 1fr);
   align-items: center;
-  gap: 22rpx;
+  gap: 12px;
 }
 
 .vehicle-card__image {
-  width: 116rpx;
-  height: 94rpx;
-  border-radius: 18rpx;
-  box-shadow: 0 10rpx 24rpx rgba(40, 52, 80, 0.1);
-}
-
-.vehicle-card__info {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12rpx;
-}
-
-.vehicle-card__plate-row {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12rpx;
+  border-radius: 12px;
 }
 
 .vehicle-card__plate {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: #172033;
-  font-size: 32rpx;
+  color: var(--mobile-workspace-ink);
+  font-size: clamp(19px, 5vw, 24px);
   font-weight: 700;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
 }
 
-.vehicle-card__model {
-  display: -webkit-box;
-  overflow: hidden;
-  color: #9aa5b7;
-  font-size: max(25rpx, 12px);
-  line-height: 1.4;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+.vehicle-sync-error {
+  padding-block: 6px;
 }
 
-.vehicle-card__tag {
-  flex: 0 0 auto;
-  padding: 10rpx 18rpx;
-  border-radius: 999rpx;
-  color: #059669;
-  background: #ecfdf5;
-  display: flex;
-  align-items: center;
-  gap: 9rpx;
-  font-size: max(22rpx, 12px);
-  font-weight: 700;
-}
-
-.vehicle-card__tag > text {
-  width: 9rpx;
-  height: 9rpx;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.section-title {
-  display: block;
-  margin-top: 7rpx;
-  color: #172033;
-  font-size: 32rpx;
-  font-weight: 700;
-}
-
-.section-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 20rpx;
-}
-
-.section-head__hint {
-  padding-bottom: 2rpx;
-  color: #748096;
-  font-size: max(21rpx, 12px);
-}
-
-.status-card__row {
-  min-height: 82rpx;
-  border-bottom: 1rpx solid #e8ecf3;
-  color: #748096;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: max(28rpx, 12px);
-}
-
-.status-card__row:first-of-type {
-  margin-top: 22rpx;
-}
-
-.status-card__row:last-child {
-  border-bottom: 0;
-}
-
-.status-card__row text:last-child {
-  color: #172033;
-  font-weight: 700;
-}
-
-.doc-card__grid {
-  margin-top: 28rpx;
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 16rpx;
-}
-
-.doc-card__item {
-  width: 100%;
-  min-height: 116rpx;
-  margin: 0;
-  padding: 18rpx 20rpx;
-  border: 1rpx solid #e8ecf3;
-  border-radius: 18rpx;
-  color: #748096;
-  background: linear-gradient(145deg, #f9fafc, #f4f7fb);
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 18rpx;
-  font-size: max(26rpx, 12px);
-  line-height: 1.2;
-  text-align: left;
-}
-
-.doc-card__item::after {
-  border: 0;
-}
-
-.doc-card__item--pressed,
-.doc-card__item:active {
-  border-color: rgba(var(--tms-primary-rgb), 0.28);
-  background: var(--tms-primary-soft);
-}
-
-.doc-card__icon {
-  flex: 0 0 76rpx;
-  width: 76rpx;
-  height: 76rpx;
-  border-radius: 22rpx;
-  color: var(--tms-primary);
-  background: var(--tms-primary-soft);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.doc-card__item > view:nth-child(2) {
-  min-width: 0;
-  flex: 1;
-  text-align: left;
-}
-
-.doc-card__name,
-.doc-card__status {
-  display: block;
-}
-
-.doc-card__name {
-  color: #172033;
-  font-size: max(26rpx, 12px);
-  font-weight: 700;
-}
-
-.doc-card__status {
-  margin-top: 8rpx;
-  color: #748096;
-  font-size: max(21rpx, 12px);
-  font-weight: 600;
+.vehicle-sync-error .driver-inline {
+  flex-shrink: 0;
 }
 </style>

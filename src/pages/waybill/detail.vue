@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import MobileWorkspace from '@mobile-core/components/MobileWorkspace.vue'
 import { computed, ref } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import { getUserFacingErrorMessage } from "@/api/supabase";
@@ -15,7 +16,12 @@ import type {
 } from "@/api/types";
 import TmsIcon from "@/components/business/TmsIcon.vue";
 import TmsRouteCard from "@/components/business/TmsRouteCard.vue";
+import MobileAction from "@mobile-core/components/MobileAction.vue";
+import MobileEvidence from "@mobile-core/components/MobileEvidence.vue";
+import MobileSegmented from "@mobile-core/components/MobileSegmented.vue";
 import MobileTopBar from "@mobile-core/components/MobileTopBar.vue";
+import TmsPageSkeleton from "@mobile-core/components/TmsPageSkeleton.vue";
+import type { MobileIconName } from "@mobile-core/icons";
 import WaybillTrackingTimeline from "@/components/business/WaybillTrackingTimeline.vue";
 import WaybillTrajectoryPanel from "@/components/business/WaybillTrajectoryPanel.vue";
 import WaybillSignatureSheet from "@/components/business/WaybillSignatureSheet.vue";
@@ -44,16 +50,12 @@ type DetailAction = "accept" | "cancel";
 type DetailTab = "tracking" | "trajectory";
 const activeAction = ref<DetailAction | "">("");
 const activeDetailTab = ref<DetailTab>("tracking");
-const detailTabOptions = [
-  { value: "tracking", payload: { label: "运单跟踪" } },
-  { value: "trajectory", payload: { label: "轨迹定位" } },
+const detailTabOptions: Array<{ value: DetailTab; label: string }> = [
+  { value: "tracking", label: "运单跟踪" },
+  { value: "trajectory", label: "轨迹定位" },
 ];
-
-function setDetailTab(option: { value: string | number }) {
-  if (option.value === "tracking" || option.value === "trajectory") {
-    activeDetailTab.value = option.value;
-  }
-}
+const detailLoading = ref(true);
+const detailError = ref("");
 const executionContext = ref<WaybillExecutionContext>();
 const signatureVisible = ref(false);
 const expenseRecords = ref<DriverExpenseRecord[]>([]);
@@ -91,24 +93,23 @@ const needsReturnCompletion = computed(() =>
 const actionBusy = computed(
   () => Boolean(activeAction.value) || waybill.actionLoading,
 );
-const deliveryProofCount = computed(
-  () =>
-    waybill.proofs.filter(
-      (proof) =>
-        proof.proofType === "delivery_photo" || proof.proofType === "receipt",
-    ).length,
-);
-
-const statusTitle = computed(() => {
-  const status = current.value?.status;
-  if (status === "accepted") return "待提货";
-  if (status === "loading") return "待发车";
-  if (status === "transporting") return "运输中";
-  if (status === "unloading") return "待卸货";
-  if (status === "signed") return "已签收";
-  if (status === "completed") return "已完成";
-  if (status === "cancelled") return "已取消";
-  return dictionary.label("tmsWaybillStatus", status, "待处理");
+const nextAction = computed<{ label: string; icon: MobileIconName; run: () => void } | null>(() => {
+  if (isAccepted.value) return { label: "装货打卡", icon: "location", run: () => openCargoOperation("loading") };
+  if (isLoading.value) return { label: "录入发车信息", icon: "vehicle", run: () => openExecutionOperation("departure") };
+  if (isTransporting.value) return { label: "到达打卡", icon: "location", run: () => openCargoOperation("unloading", "arrival") };
+  if (isUnloading.value) {
+    return executionContext.value?.unloadingStatus === "completed"
+      ? { label: "办理签收", icon: "success", run: () => { signatureVisible.value = true; } }
+      : { label: "填写卸货信息", icon: "box", run: () => openCargoOperation("unloading") };
+  }
+  if (isSigned.value || needsReturnCompletion.value) {
+    return {
+      label: isCompleted.value ? "补录收车信息" : "录入收车信息",
+      icon: "check",
+      run: () => openExecutionOperation("completion"),
+    };
+  }
+  return null;
 });
 
 const statusHint = computed(() => {
@@ -125,12 +126,11 @@ const statusHint = computed(() => {
       : "已到达目的地，请填写卸货信息";
   if (item.status === "signed") return "签收已完成，请录入收车时间和收车里程";
   if (item.status === "completed") {
-    return needsReturnCompletion.value
-      ? "历史完成状态缺少回场档案，请补录收车时间、里程和照片"
-      : `已于${formatDateTime(item.completedAt || item.unloadedAt)}送达!`;
+    if (needsReturnCompletion.value) return "请补录收车时间、里程和照片";
+    const deliveredAt = item.completedAt || item.unloadedAt;
+    return deliveredAt ? `送达时间 ${formatDateTime(deliveredAt)}` : "";
   }
-  if (item.status === "cancelled") return "该运单已取消";
-  return "请核对订单信息后接受任务";
+  return "";
 });
 
 const proofUrls = computed(() =>
@@ -189,8 +189,14 @@ onLoad((query) => {
 onShow(() => void load());
 
 async function load() {
-  if (!id.value) return;
   const requestedId = id.value;
+  if (!requestedId) {
+    detailError.value = "缺少运单编号，请返回任务列表重新打开。";
+    detailLoading.value = false;
+    return;
+  }
+  detailLoading.value = true;
+  detailError.value = "";
   try {
     trackingWarning.value = "";
     const loaded = await waybill.loadDetail(requestedId);
@@ -225,10 +231,11 @@ async function load() {
     }
     await tryAutomaticCargoCheckIn(loaded);
   } catch (error) {
-    uni.showToast({
-      title: getUserFacingErrorMessage(error, "任务详情加载失败，请稍后重试"),
-      icon: "none",
-    });
+    if (requestedId === id.value) {
+      detailError.value = getUserFacingErrorMessage(error, "任务详情加载失败，请重试。");
+    }
+  } finally {
+    if (requestedId === id.value) detailLoading.value = false;
   }
 }
 
@@ -385,875 +392,183 @@ function viewReceipt(current?: string) {
 }
 </script>
 
+
 <template>
-<wd-config-provider :theme="themeName">
-  <view
-    class="detail-page page"
-    :class="{ 'detail-page--pending': isPending }"
-  >
-    <view class="detail-page__blue">
-      <MobileTopBar
-        title="任务详情"
-        eyebrow="运单进度"
-        subtitle="按当前运输节点完成操作"
-        show-back
-      />
-      <view v-if="current" class="detail-page__status">
-        <view class="detail-page__status-icon"
-          ><TmsIcon name="document" size="38rpx"
-        /></view>
-        <view>
-          <text class="detail-page__status-title">{{ statusTitle }}</text>
-          <text class="detail-page__hint">{{ statusHint }}</text>
-        </view>
-      </view>
-    </view>
+  <wd-config-provider :theme="themeName">
+    <MobileWorkspace class="page driver-page">
+      <MobileTopBar title="任务详情" show-back capsule="always" />
 
-    <scroll-view
-      scroll-y
-      class="detail-page__scroll"
-      :class="{ 'detail-page__scroll--header-only': !current && !isPending }"
-    >
-      <view v-if="current" class="detail-page__content">
-        <TmsRouteCard
-          :waybill="current"
-          :show-progress="!isPending"
-          :clickable="false"
-          @navigate="navigate"
-        >
-          <view v-if="!isPending" class="detail-actions">
-            <view v-if="isAccepted" class="detail-actions__helper">
-              <TmsIcon name="info" size="28rpx" />
-              <text>到达装货地后先定位打卡，再补齐重量、现场照片和磅单</text>
-            </view>
-            <view
-              v-else-if="isLoading"
-              class="detail-actions__helper detail-actions__helper--success"
-            >
-              <TmsIcon name="success" size="28rpx" />
-              <text>提货凭证已保存，请确认车辆已发车</text>
-            </view>
-            <view v-else-if="isUnloading" class="detail-actions__helper">
-              <TmsIcon name="info" size="28rpx" />
-              <text>{{
-                executionContext?.unloadingStatus === "completed"
-                  ? "卸货资料已完成，可以办理签收"
-                  : "请补齐卸货净重、现场照片和磅单"
-              }}</text>
-            </view>
-            <view
-              v-else-if="isSigned || needsReturnCompletion"
-              class="detail-actions__helper"
-              :class="{
-                'detail-actions__helper--success': isSigned && !isCompleted,
-              }"
-            >
-              <TmsIcon
-                :name="isCompleted ? 'warning' : 'success'"
-                size="28rpx"
-              />
-              <text>{{
-                isCompleted
-                  ? "检测到历史完成状态缺少回场档案，请补录"
-                  : `签收已确认，${deliveryProofCount} 张回单已归档`
-              }}</text>
-            </view>
+      <view class="driver-content" :class="{ 'mobile-content-with-dock': current && isPending }" role="main">
+        <template v-if="current">
+          <TmsRouteCard
+            :waybill="current"
+            :show-progress="!isPending && current.status !== 'cancelled'"
+            :clickable="false"
+            variant="detail"
+            @navigate="navigate"
+          >
+            <MobileAction v-if="canReportExpense" class="driver-inline" @click="openExpense">
+              <TmsIcon name="expense" size="29rpx" aria-hidden="true" /> 费用上报
+            </MobileAction>
+          </TmsRouteCard>
 
-            <view class="detail-actions__controls">
-              <view v-if="isAccepted" class="detail-actions__outline">
-                <wd-button
-                  custom-class="tms-danger-action"
-                  type="danger"
-                  variant="plain"
-                  block
-                  :round="false"
-                  :disabled="actionBusy"
-                  @click="cancel"
-                >
-                  <view class="detail-actions__button-content">
-                    <wd-loading
-                      v-if="activeAction === 'cancel'"
-                      type="circular"
-                      color="#dc2626"
-                      size="28rpx"
-                    />
-                    <TmsIcon v-else name="close" size="28rpx" />
-                    <text>{{
-                      activeAction === "cancel" ? "正在取消" : "取消运单"
-                    }}</text>
-                  </view>
-                </wd-button>
-              </view>
-              <view v-if="isAccepted" class="detail-actions__primary">
-                <wd-button
-                  custom-class="tms-primary-action"
-                  type="primary"
-                  block
-                  :round="false"
-                  :disabled="actionBusy"
-                  @click="openCargoOperation('loading')"
-                >
-                  <view class="detail-actions__button-content">
-                    <TmsIcon name="location" size="30rpx" />
-                    <text>装货打卡</text>
-                  </view>
-                </wd-button>
-              </view>
-              <wd-button
-                v-else-if="isLoading"
-                class="detail-actions__primary detail-actions__primary--wide"
-                custom-class="tms-primary-action"
-                custom-style="width: 100%;"
-                type="primary"
-                :round="false"
-                :disabled="actionBusy"
-                @click="openExecutionOperation('departure')"
-              >
-                <view class="detail-actions__button-content">
-                  <TmsIcon name="vehicle" size="30rpx" />
-                  <text>录入发车信息</text>
-                </view>
-              </wd-button>
-              <wd-button
-                v-else-if="isTransporting"
-                class="detail-actions__primary detail-actions__primary--wide"
-                custom-class="tms-primary-action"
-                custom-style="width: 100%;"
-                type="primary"
-                :round="false"
-                :disabled="actionBusy"
-                @click="openCargoOperation('unloading', 'arrival')"
-              >
-                <view class="detail-actions__button-content">
-                  <TmsIcon name="location" size="30rpx" />
-                  <text>到达打卡</text>
-                </view>
-              </wd-button>
-              <wd-button
-                v-else-if="isUnloading"
-                class="detail-actions__primary detail-actions__primary--wide"
-                custom-class="tms-primary-action"
-                custom-style="width: 100%;"
-                type="primary"
-                :round="false"
-                :disabled="actionBusy"
-                @click="
-                  executionContext?.unloadingStatus === 'completed'
-                    ? (signatureVisible = true)
-                    : openCargoOperation('unloading')
-                "
-              >
-                <view class="detail-actions__button-content">
-                  <TmsIcon
-                    :name="
-                      executionContext?.unloadingStatus === 'completed'
-                        ? 'success'
-                        : 'box'
-                    "
-                    size="30rpx"
-                  />
-                  <text>{{
-                    executionContext?.unloadingStatus === "completed"
-                      ? "办理签收"
-                      : "填写卸货信息"
-                  }}</text>
-                </view>
-              </wd-button>
-              <wd-button
-                v-else-if="isSigned || needsReturnCompletion"
-                class="detail-actions__primary detail-actions__primary--wide"
-                custom-class="tms-primary-action"
-                custom-style="width: 100%;"
-                type="primary"
-                :round="false"
-                :disabled="actionBusy"
-                @click="openExecutionOperation('completion')"
-              >
-                <view class="detail-actions__button-content">
-                  <TmsIcon name="check" size="30rpx" />
-                  <text>{{
-                    isCompleted ? "补录收车信息" : "录入收车信息"
-                  }}</text>
-                </view>
-              </wd-button>
-              <wd-button
-                v-else-if="isCompleted"
-                class="detail-actions__receipt"
-                custom-class="tms-secondary-action"
-                custom-style="width: 100%;"
-                type="primary"
-                variant="plain"
-                :round="false"
-                @click="viewReceipt()"
-              >
-                <view class="detail-actions__button-content">
-                  <TmsIcon name="eye" size="30rpx" />
-                  <text>查看运输单据</text>
-                </view>
-              </wd-button>
-            </view>
-            <wd-button
-              v-if="canReportExpense"
-              class="detail-actions__expense"
-              custom-class="tms-secondary-action"
-              type="primary"
-              variant="plain"
-              :round="false"
-              @click="openExpense"
-            >
-              <view class="detail-actions__button-content">
-                <TmsIcon name="expense" size="30rpx" />
-                <text>费用上报</text>
-              </view>
-            </wd-button>
+          <view v-if="detailError" class="driver-card detail-sync-warning" role="alert">
+            <text class="driver-copy">{{ detailError }}</text>
+            <MobileAction class="driver-inline" @click="load">重试</MobileAction>
           </view>
-        </TmsRouteCard>
 
-        <wd-segmented
-          :value="activeDetailTab"
-          :options="detailTabOptions"
-          theme="outline"
-          custom-class="detail-tabs card"
-          role="tablist"
-          aria-label="运单详情视图"
-          @change="setDetailTab"
-        >
-          <template #label="{ option }">
-            <view
-              class="detail-tabs__item"
-              role="tab"
-              :aria-selected="activeDetailTab === option.value"
-              tabindex="0"
-              @keydown.enter="setDetailTab(option)"
-              @keydown.space.prevent="setDetailTab(option)"
+          <view v-if="!isPending && current.status !== 'cancelled'" class="driver-card detail-actions">
+            <text v-if="statusHint" class="driver-copy">{{ statusHint }}</text>
+            <MobileAction
+              v-if="nextAction"
+              class="detail-operation tms-primary-action"
+              :disabled="actionBusy"
+              @click="nextAction.run"
             >
-              <TmsIcon :name="option.value === 'tracking' ? 'document' : 'location'" size="28rpx" />
-              <text>{{ option.payload.label }}</text>
-              <i v-if="option.value === 'tracking' && waybill.events.length" class="detail-tabs__count">
-                {{ waybill.events.length }}
-              </i>
-            </view>
-          </template>
-        </wd-segmented>
+              <TmsIcon :name="nextAction.icon" size="30rpx" aria-hidden="true" />
+              {{ nextAction.label }}
+            </MobileAction>
+            <MobileAction
+              v-else-if="isCompleted"
+              class="detail-operation tms-secondary-action"
+              @click="viewReceipt()"
+            >查看运输单据</MobileAction>
+            <MobileAction
+              v-if="isAccepted"
+              class="detail-danger"
+              :disabled="actionBusy"
+              @click="cancel"
+            >{{ activeAction === 'cancel' ? '正在取消…' : '取消运单' }}</MobileAction>
+          </view>
 
-        <WaybillTrackingTimeline
-          v-if="activeDetailTab === 'tracking'"
-          :waybill="current"
-          :events="waybill.events"
-          :expenses="expenseRecords"
-          :sync-warning="trackingWarning"
-        />
-        <WaybillTrajectoryPanel
-          v-else
-          :waybill="current"
-          :events="waybill.events"
-        />
+          <MobileSegmented v-model="activeDetailTab" :options="detailTabOptions" label="运单详情视图" />
 
-        <view class="info-card card">
-          <view class="section-head">
-            <view>
-              <text class="section-eyebrow">货物档案</text>
-              <text class="section-title">货物信息</text>
-            </view>
-            <text class="section-head__hint">{{
-              current.cargoName || "运输货物"
-            }}</text>
-          </view>
-          <view class="info-list">
-            <view
-              v-for="row in cargoRows"
-              :key="row.label"
-              class="info-list__row"
-            >
-              <text>{{ row.label }}</text>
-              <text>{{ row.value }}</text>
-            </view>
-          </view>
-        </view>
-
-        <view class="info-card card">
-          <view class="section-head">
-            <view>
-              <text class="section-eyebrow">运输站点</text>
-              <text class="section-title">站点与联系人</text>
-            </view>
-            <text class="section-head__hint">可快捷拨号</text>
-          </view>
-          <view class="station-list">
-            <view
-              v-for="row in stationRows"
-              :key="row.label"
-              class="station-list__row"
-            >
-              <text class="station-list__label">{{ row.label }}</text>
-              <view class="station-list__main">
-                <view class="station-list__head">
-                  <text class="station-list__station">{{ row.station }}</text>
-                  <text class="station-list__name">{{ row.name }}</text>
-                </view>
-                <text class="station-list__phone">{{
-                  maskPhone(row.phone)
-                }}</text>
-                <text class="station-list__address">{{ row.address }}</text>
-              </view>
-              <wd-button
-                :aria-label="`拨打${row.label}电话`"
-                custom-style="width: 88rpx; min-width: 44px; height: 88rpx; min-height: 44px; padding: 0; border-radius: 50%; background: #25bf75; color: #fff; box-shadow: 0 10rpx 20rpx rgba(16, 185, 129, 0.2);"
-                @click="callPhone(row.phone)"
-              >
-                <TmsIcon name="phone" size="38rpx" />
-              </wd-button>
-            </view>
-          </view>
-        </view>
-
-        <view v-if="waybill.proofs.length" class="proof-card card">
-          <view class="section-head">
-            <view>
-              <text class="section-eyebrow">凭证资料</text>
-              <text class="section-title">运输单据</text>
-            </view>
-            <text class="section-head__hint"
-              >{{ waybill.proofs.length }} 份</text
-            >
-          </view>
-          <view class="proof-card__grid">
-            <button
-              v-for="(proof, index) in waybill.proofs"
-              :key="proof.id"
-              class="proof-card__image"
-              :aria-label="`预览第 ${index + 1} 份运输单据`"
-              @click="viewReceipt(proof.fileUrl)"
-            >
-              <image :src="proof.fileUrl" mode="aspectFill" />
-            </button>
-          </view>
-        </view>
-      </view>
-      <view v-else class="detail-page__state card">
-        <view class="detail-page__state-icon">
-          <wd-loading
-            v-if="waybill.loading"
-            type="circular"
-            color="var(--tms-primary)"
-            size="58rpx"
+          <WaybillTrackingTimeline
+            v-if="activeDetailTab === 'tracking'"
+            :waybill="current"
+            :events="waybill.events"
+            :expenses="expenseRecords"
+            :sync-warning="trackingWarning"
           />
-          <TmsIcon v-else name="document" size="62rpx" />
-        </view>
-        <text class="detail-page__state-title">
-          {{ waybill.loading ? "正在加载任务详情" : "暂时无法显示任务" }}
-        </text>
-        <text class="detail-page__state-hint">
-          {{
-            waybill.loading
-              ? "正在同步运输节点、货物与站点信息"
-              : "请返回运单列表后重新进入"
-          }}
-        </text>
-      </view>
-    </scroll-view>
+          <WaybillTrajectoryPanel v-else :waybill="current" :events="waybill.events" />
 
-    <view v-if="current && isPending" class="pending-footer">
-      <view>
-        <text class="pending-footer__label">运费：</text>
-        <text class="pending-footer__money">{{
-          formatMoney(current.freightAmount)
-        }}</text>
+          <view>
+            <text class="mobile-group-title" role="heading" aria-level="2">货物信息</text>
+            <view class="mobile-group">
+              <view v-for="row in cargoRows" :key="row.label" class="mobile-row mobile-row--static detail-info-row">
+                <text class="driver-copy">{{ row.label }}</text>
+                <text class="detail-info-row__value">{{ row.value }}</text>
+              </view>
+            </view>
+          </view>
+
+          <view>
+            <text class="mobile-group-title" role="heading" aria-level="2">站点与联系人</text>
+            <view class="mobile-group">
+              <view v-for="row in stationRows" :key="row.label" class="mobile-row mobile-row--static detail-station">
+                <view class="mobile-row__body">
+                  <text class="mobile-row__label">{{ row.label }} · {{ row.station }}</text>
+                  <text class="mobile-row__detail">{{ row.address }}</text>
+                  <text class="mobile-row__detail">{{ row.name }}<template v-if="row.phone"> · {{ maskPhone(row.phone) }}</template></text>
+                </view>
+                <MobileAction
+                  v-if="row.phone"
+                  class="detail-phone"
+                  :aria-label="'拨打' + row.label + '电话'"
+                  @click="callPhone(row.phone)"
+                ><TmsIcon name="phone" size="31rpx" aria-hidden="true" /></MobileAction>
+              </view>
+            </view>
+          </view>
+
+          <view v-if="proofUrls.length">
+            <view class="driver-heading">
+              <text class="mobile-group-title" role="heading" aria-level="2">运输单据</text>
+              <text class="driver-copy">{{ proofUrls.length }} 份</text>
+            </view>
+            <view class="driver-card">
+              <MobileEvidence readonly :images="proofUrls" label="运输单据" @preview="viewReceipt(proofUrls[$event])" />
+            </view>
+          </view>
+        </template>
+
+        <TmsPageSkeleton
+          v-else
+          label="正在加载任务详情…"
+          :error="detailLoading ? '' : detailError || '找不到此任务，请返回任务列表重新打开。'"
+          @retry="load"
+        />
       </view>
-      <view class="pending-footer__button">
-        <wd-button
-          custom-class="tms-primary-action"
-          type="primary"
-          block
-          :round="false"
-          :disabled="actionBusy"
+
+      <view v-if="current && isPending" class="mobile-dock pending-footer" aria-label="接受运输任务">
+        <view class="pending-footer__charge">
+          <text class="driver-copy">本单运费</text>
+          <text class="pending-footer__money">{{ formatMoney(current.freightAmount) }}</text>
+        </view>
+        <MobileAction
+          class="mobile-dock__action tms-primary-action"
+          :disabled="actionBusy" :aria-busy="activeAction === 'accept'"
           @click="accept"
         >
-          <view class="detail-actions__button-content">
-            <wd-loading
-              v-if="activeAction === 'accept'"
-              type="circular"
-              color="#ffffff"
-              size="30rpx"
-            />
-            <TmsIcon v-else name="success" size="32rpx" />
-            <text>{{
-              activeAction === "accept" ? "正在接受任务" : "确认接受任务"
-            }}</text>
-          </view>
-        </wd-button>
+          <wd-loading v-if="activeAction === 'accept'" type="circular" color="#fff" size="30rpx" />
+          {{ activeAction === 'accept' ? '正在接受任务…' : '确认接受任务' }}
+        </MobileAction>
       </view>
-    </view>
 
-    <WaybillSignatureSheet
-      v-model="signatureVisible"
-      :waybill="current"
-      @success="handleSignatureSuccess"
-    />
-  </view>
-</wd-config-provider>
+      <WaybillSignatureSheet v-model="signatureVisible" :waybill="current" @success="handleSignatureSuccess" />
+    </MobileWorkspace>
+  </wd-config-provider>
 </template>
 
 <style scoped lang="scss">
-.detail-page {
-  height: 100vh;
-  height: 100dvh;
-  overflow: hidden;
-  background: var(--tms-bg);
+.detail-actions { display: grid; gap: 10px; }
+.detail-sync-warning { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+.detail-operation {
   display: flex;
-  flex-direction: column;
-}
-
-.detail-page__blue {
-  flex: 0 0 auto;
-  color: #fff;
-  background: linear-gradient(135deg, var(--tms-primary-deep) 0%, var(--tms-primary) 56%, var(--tms-primary-bright) 118%);
-}
-
-.detail-page__status {
-  margin: 0 28rpx;
-  padding: 22rpx 22rpx 28rpx;
-  border-top: 1rpx solid rgba(255, 255, 255, 0.14);
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-}
-
-.detail-page__status-icon {
-  flex: 0 0 64rpx;
-  width: 64rpx;
-  height: 64rpx;
-  border: 1rpx solid rgba(255, 255, 255, 0.16);
-  border-radius: 20rpx;
-  background: rgba(255, 255, 255, 0.11);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.detail-page__status-title {
-  display: block;
-  font-size: 30rpx;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.detail-page__hint {
-  display: block;
-  margin-top: 12rpx;
-  font-size: max(22rpx, 12px);
-  font-weight: 600;
-  opacity: 0.72;
-}
-
-.detail-page__scroll {
-  flex: 1;
-  min-height: 0;
-  height: auto;
-}
-
-.detail-page__content {
-  padding: 24rpx 28rpx 58rpx;
-  display: flex;
-  flex-direction: column;
-  gap: 20rpx;
-}
-
-.detail-page--pending .detail-page__content {
-  padding-top: 26rpx;
-  padding-bottom: 34rpx;
-}
-
-.detail-tabs {
-  padding: 8rpx;
-  gap: 8rpx;
-}
-
-:deep(.detail-tabs)::before {
-  display: none;
-}
-
-:deep(.detail-tabs .wd-segmented__item) {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 0;
-  min-height: var(--tms-control-height);
-  margin: 0;
-  padding: 0 14rpx;
-  color: var(--tms-text-secondary);
-  background: transparent;
-  border-radius: 16rpx;
-  font-size: max(24rpx, 12px);
-  font-weight: 700;
-  line-height: 1;
-  touch-action: manipulation;
-}
-
-.detail-tabs__item {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 9rpx;
   width: 100%;
-  min-height: var(--tms-control-height);
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
 }
 
-.detail-tabs__item:focus-visible {
-  outline: 2px solid currentColor;
-  outline-offset: -4px;
-  border-radius: 16rpx;
-}
-
-.detail-tabs__item > :deep(.tms-icon) {
-  flex: 0 0 28rpx;
-  width: 28rpx !important;
-  min-width: 28rpx;
-  height: 28rpx !important;
-  min-height: 28rpx;
-}
-
-:deep(.detail-tabs .wd-segmented__item + .wd-segmented__item) {
-  border-left: 0;
-}
-
-:deep(.detail-tabs .wd-segmented__item.is-active) {
-  color: var(--tms-primary-strong);
-  background: linear-gradient(135deg, var(--tms-primary-soft), var(--tms-primary-soft-strong));
-  box-shadow: inset 0 0 0 1rpx rgba(var(--tms-primary-rgb), 0.12);
-}
-
-:deep(.detail-tabs .wd-segmented__item.is-active)::before {
-  position: absolute;
-  right: 26rpx;
-  bottom: 0;
-  left: 26rpx;
-  height: 5rpx;
-  content: "";
-  background: linear-gradient(90deg, var(--tms-primary), var(--tms-primary-bright));
-  border-radius: 999rpx;
-}
-
-.detail-tabs__count {
-  flex: 0 0 auto;
-  min-width: 34rpx;
-  height: 34rpx;
-  padding: 0 8rpx;
-  color: #fff;
-  background: var(--tms-red);
-  border-radius: 999rpx;
-  font-size: max(18rpx, 12px);
-  font-style: normal;
-  line-height: 34rpx;
+.detail-danger {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 10px;
+  color: var(--tms-red-strong);
+  font-size: max(24rpx, 13px);
+  font-weight: 660;
   text-align: center;
 }
 
-.section-title {
-  display: block;
-  margin-top: 7rpx;
-  color: var(--tms-text-strong);
-  font-size: 32rpx;
-  font-weight: 700;
+.detail-info-row { justify-content: space-between; }
+.detail-info-row > text { min-width: 0; }
+.detail-info-row__value {
+  color: var(--mobile-workspace-ink);
+  font-size: 14px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+  text-align: end;
 }
-
-.detail-actions {
-  margin-top: 32rpx;
-  padding-top: 26rpx;
-  border-top: 1rpx solid var(--tms-line-subtle);
-  display: flex;
-  flex-direction: column;
-  gap: 20rpx;
-}
-
-.detail-actions__helper {
-  min-height: 58rpx;
-  padding: 12rpx 16rpx;
-  border-radius: 14rpx;
-  color: var(--tms-primary);
+.detail-phone {
+  display: grid;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--mobile-workspace-accent);
   background: var(--tms-primary-soft);
-  display: flex;
-  align-items: center;
-  gap: 10rpx;
-  font-size: max(21rpx, 12px);
-  font-weight: 600;
-  line-height: 1.4;
-}
-
-.detail-actions__helper text {
-  min-width: 0;
-  flex: 1;
-}
-
-.detail-actions__helper--success {
-  color: var(--tms-green-strong);
-  background: var(--tms-green-soft);
-}
-
-.detail-actions__controls {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-}
-
-.section-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 20rpx;
-}
-
-.section-head__hint {
-  max-width: 260rpx;
-  overflow: hidden;
-  color: #748096;
-  font-size: max(21rpx, 12px);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.detail-actions__primary,
-.detail-actions__outline {
-  min-width: 0;
-}
-
-.detail-actions__primary {
-  min-width: 0;
-  flex: 1;
-}
-
-.detail-actions__primary--wide {
-  width: 100%;
-}
-
-.detail-actions__outline {
-  flex: 0 0 176rpx;
-}
-
-.detail-actions__receipt {
-  width: 100%;
-}
-
-.detail-actions__expense {
-  width: 100%;
-}
-
-.detail-actions__button-content {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10rpx;
-  white-space: nowrap;
-}
-
-.detail-actions__button-content text {
-  white-space: nowrap;
-}
-
-.detail-actions__primary.is-disabled,
-.detail-actions__outline.is-disabled,
-.pending-footer__button.is-disabled {
-  opacity: 0.68;
-  box-shadow: none;
-}
-
-.info-card,
-.proof-card {
-  padding: 30rpx;
-  border-radius: 24rpx;
-}
-
-.info-list {
-  margin-top: 22rpx;
-  padding-top: 8rpx;
-}
-
-.info-list__row {
-  min-height: 70rpx;
-  border-bottom: 1rpx solid var(--tms-line-subtle);
-  color: var(--tms-text-secondary);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 28rpx;
-  font-size: max(26rpx, 12px);
-}
-
-.info-list__row text:last-child {
-  color: var(--tms-text-strong);
-  font-weight: 700;
-  text-align: right;
-}
-
-.station-list {
-  margin-top: 28rpx;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.info-list__row:last-child {
-  border-bottom: 0;
-}
-
-.station-list__row {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: 86rpx minmax(0, 1fr) 44px;
-  align-items: center;
-  gap: 16rpx;
-  padding: 24rpx 0;
-  border-bottom: 1rpx solid var(--tms-line-subtle);
-}
-
-.station-list__row:last-child {
-  padding-bottom: 0;
-  border-bottom: 0;
-}
-
-.station-list__label {
-  color: var(--tms-text-secondary);
-  font-size: max(26rpx, 12px);
-  line-height: 1.2;
-}
-
-.station-list__main {
-  min-width: 0;
-  color: var(--tms-text-strong);
-  display: flex;
-  flex-direction: column;
-  gap: 8rpx;
-  font-size: max(26rpx, 12px);
-  font-weight: 700;
-}
-
-.station-list__head {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
-  align-items: center;
-  gap: 12rpx;
-}
-
-.station-list__station,
-.station-list__name,
-.station-list__phone {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.station-list__phone {
-  color: var(--tms-text-strong);
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.station-list__address {
-  color: var(--tms-text-secondary);
-  font-size: max(24rpx, 12px);
-  font-weight: 600;
-  line-height: 1.4;
-  white-space: normal;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-.proof-card__grid {
-  margin-top: 26rpx;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 18rpx;
-}
-
-.proof-card__image {
-  width: 100%;
-  height: 150rpx;
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  border: 0;
-  border-radius: 16rpx;
-  background: var(--tms-surface-muted);
-}
-
-.proof-card__image image {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-.detail-page__state {
-  margin: 38rpx 28rpx;
-  min-height: 360rpx;
-  padding: 44rpx;
-  color: var(--tms-text-secondary);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16rpx;
-  text-align: center;
-}
-
-.detail-page__state-icon {
-  width: 112rpx;
-  height: 112rpx;
-  margin-bottom: 8rpx;
-  border-radius: 34rpx;
-  color: var(--tms-primary);
-  background: var(--tms-primary-soft);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.detail-page__state-title {
-  color: var(--tms-text-strong);
-  font-size: 29rpx;
-  font-weight: 700;
-}
-
-.detail-page__state-hint {
-  max-width: 470rpx;
-  color: var(--tms-text-secondary);
-  font-size: max(23rpx, 12px);
-  line-height: 1.55;
 }
 
 .pending-footer {
-  position: relative;
-  flex: 0 0 auto;
-  z-index: 30;
-  min-height: calc(128rpx + env(safe-area-inset-bottom));
-  padding: 22rpx 30rpx calc(22rpx + env(safe-area-inset-bottom));
-  background: rgba(255, 255, 255, 0.98);
-  border-top: 1rpx solid var(--tms-line-subtle);
-  display: flex;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
-  gap: 26rpx;
-  box-shadow: 0 -12rpx 34rpx rgba(32, 40, 66, 0.09);
+  gap: 14px;
 }
-
-.pending-footer__label {
-  color: var(--tms-text-strong);
-  font-size: max(26rpx, 12px);
-}
-
-.pending-footer__money {
-  color: var(--tms-primary);
-  font-size: 34rpx;
-  font-weight: 700;
-}
-
-.pending-footer__button {
-  flex: 0 0 328rpx;
-  min-width: 0;
-}
-
+.pending-footer__charge { display: grid; gap: 2px; }
+.pending-footer__money { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 </style>

@@ -1,7 +1,12 @@
 <script setup lang="ts">
+import MobileWorkspace from '@mobile-core/components/MobileWorkspace.vue'
 import { computed, reactive, ref } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import { getUserFacingErrorMessage } from "@/api/supabase";
+import MobileAction from "@mobile-core/components/MobileAction.vue";
+import MobileEvidence from "@mobile-core/components/MobileEvidence.vue";
+import MobileField from "@mobile-core/components/MobileField.vue";
+import MobileStatusTag from "@mobile-core/components/MobileStatusTag.vue";
 import MobileTopBar from "@mobile-core/components/MobileTopBar.vue";
 import TmsIcon from "@/components/business/TmsIcon.vue";
 import TmsPageSkeleton from "@mobile-core/components/TmsPageSkeleton.vue";
@@ -139,10 +144,6 @@ const policyLabel = computed(() => {
   if (!context.value?.geofenceEnabled) return "围栏校验已停用";
   return context.value.allowOutsideCheckIn ? "可围栏外打卡" : "仅围栏内打卡";
 });
-const autoLabel = computed(() => {
-  if (!context.value?.geofenceEnabled) return "仅记录定位";
-  return context.value.autoCheckIn ? "围栏内自动打卡" : "手动打卡";
-});
 const policyHint = computed(() => {
   if (!context.value?.geofenceEnabled) {
     return "电子围栏校验已关闭，定位仅用于运输留痕，不再按装卸货地点距离拦截打卡。";
@@ -195,7 +196,6 @@ async function load() {
     if (!operation && context.value.autoCheckIn) await tryAutomaticCheckIn();
   } catch (error) {
     state.error = getUserFacingErrorMessage(error, `${title.value}信息加载失败`);
-    showError(error, `${title.value}信息加载失败`);
   } finally {
     state.loading = false;
   }
@@ -292,7 +292,7 @@ async function handleCheckIn() {
 }
 
 async function uploadEvidence(kind: "photo" | "ticket") {
-  if (!current.value || state.uploading) return;
+  if (!current.value || !context.value?.operation || isCompleted.value || state.uploading || state.submitting || state.analyzing) return;
   try {
     const currentCount =
       kind === "photo"
@@ -327,7 +327,8 @@ async function uploadEvidence(kind: "photo" | "ticket") {
   }
 }
 
-function preview(url: string, urls: string[]) {
+function preview(url: string | undefined, urls: string[]) {
+  if (!url) return;
   uni.previewImage({ current: url, urls });
 }
 
@@ -371,6 +372,7 @@ async function analyzeWeighbridgeTicket() {
 }
 
 async function submit() {
+  if (state.submitting || state.uploading || state.analyzing || isCompleted.value) return;
   if (!context.value?.operation) {
     uni.showToast({ title: `请先完成${title.value}打卡`, icon: "none" });
     return;
@@ -437,1021 +439,246 @@ function showError(error: unknown, fallback: string) {
 </script>
 
 <template>
-<wd-config-provider :theme="themeName">
-  <view
-    class="operation-page page"
-    :class="{
-      'operation-page--with-footer': context?.operation && !isCompleted && !checkinOnly,
-    }"
-  >
-    <view class="operation-page__hero">
-      <MobileTopBar :title="pageTitle" show-back />
-      <view class="operation-page__hero-main">
-        <view class="operation-page__hero-icon">
-          <TmsIcon
-            :name="operationType === 'loading' ? 'vehicle' : 'document'"
-            size="44rpx"
-          />
-        </view>
-        <view>
-          <text class="operation-page__eyebrow">现场作业</text>
-          <text class="operation-page__title">{{
-            current?.waybillNo || "运单装卸货"
-          }}</text>
-          <text class="operation-page__address">{{ address }}</text>
-        </view>
-      </view>
-    </view>
-
-    <scroll-view scroll-y class="operation-page__scroll">
+  <wd-config-provider :theme="themeName">
+    <MobileWorkspace class="page driver-page operation-page" :class="themeName">
+      <MobileTopBar :title="pageTitle" capsule="always" show-back />
       <TmsPageSkeleton
         v-if="state.loading || state.error"
-        :label="`正在加载${title}规则与现场资料…`"
+        :label="'正在加载' + title + '规则与现场资料…'"
         :error="state.error"
         @retry="load"
       />
 
-      <view v-else-if="context" class="operation-page__content">
-        <view class="policy-card card">
-          <view class="policy-card__header">
-            <view>
-              <text class="section-kicker">电子围栏策略</text>
-              <text class="section-title">{{ policyLabel }}</text>
+      <view
+        v-else-if="context"
+        class="driver-content operation-page__content"
+        :class="{ 'mobile-content-with-dock': context.operation && !isCompleted && !checkinOnly }"
+        role="main"
+      >
+        <view class="driver-card driver-stack" aria-labelledby="cargo-checkin-title">
+          <view class="cargo-checkin">
+            <view class="cargo-checkin__icon" :class="{ 'cargo-checkin__icon--done': context.operation }">
+              <TmsIcon :name="context.operation ? 'check' : 'location'" size="21px" />
             </view>
-            <view class="policy-card__badge">{{ autoLabel }}</view>
-          </view>
-          <view class="policy-card__grid">
-            <view
-              ><text>围栏半径</text
-              ><strong>{{ context.radiusM }} 米</strong></view
-            >
-            <view
-              ><text>资料要求</text><strong>净重 + 照片 + 磅单</strong></view
-            >
-          </view>
-          <text class="policy-card__hint">{{ policyHint }}</text>
-        </view>
-
-        <view
-          class="checkin-card card"
-          :class="{ 'is-done': context.operation }"
-        >
-          <view class="checkin-card__status">
-            <view class="checkin-card__icon">
-              <TmsIcon
-                :name="context.operation ? 'check' : 'location'"
-                size="36rpx"
-              />
-            </view>
-            <view>
-              <text class="section-title">{{
-                context.operation ? "已完成定位打卡" : "等待定位打卡"
-              }}</text>
-              <text class="checkin-card__sub">
-                {{
-                  context.operation
-                    ? `${formatDateTime(context.operation.checkinTime)} · ${checkinModeLabel}`
-                    : "打卡时间和位置以服务端记录为准"
-                }}
+            <view class="cargo-checkin__heading">
+              <text id="cargo-checkin-title" class="section-title" role="heading" aria-level="2">
+                {{ context.operation ? "已完成定位打卡" : "等待定位打卡" }}
               </text>
+              <text class="driver-copy" translate="no">{{ current?.waybillNo }}</text>
             </view>
+            <MobileStatusTag v-if="isCompleted" label="资料已提交" tone="green" hide-dot />
           </view>
-          <view v-if="context.operation" class="checkin-card__metrics">
-            <view>
-              <text>{{
-                context.geofenceEnabled ? "围栏判定" : "围栏校验"
-              }}</text>
-              <strong>{{
-                !context.geofenceEnabled
-                  ? "已停用"
-                  : context.operation.insideGeofence
-                    ? "围栏内"
-                    : "围栏外"
-              }}</strong>
-            </view>
-            <view>
-              <text>{{ context.geofenceEnabled ? '距中心' : '定位用途' }}</text>
-              <strong>{{ context.geofenceEnabled ? `${Math.round(context.operation.distanceM)} 米` : '仅留痕' }}</strong>
-            </view>
-            <view>
-              <text>定位精度</text>
-              <strong>{{
-                context.operation.locationAccuracyM
-                  ? `约 ${Math.round(context.operation.locationAccuracyM)} 米`
-                  : "--"
-              }}</strong>
-            </view>
-          </view>
-          <view v-else class="checkin-card__button">
-            <wd-button
-              custom-class="tms-primary-action"
-              type="primary"
-              block
-              :round="false"
-              :loading="state.locating"
-              loading-color="#ffffff"
-              :disabled="state.locating"
-              @click="handleCheckIn"
-            >
-              <view class="tms-inline-action">
-                <TmsIcon v-if="!state.locating" name="location" size="32rpx" />
-                <text>获取定位并打卡</text>
+          <text class="cargo-checkin__address">{{ address }}</text>
+          <view v-if="context.operation" class="cargo-checkin__detail">
+            <text class="driver-copy">{{ formatDateTime(context.operation.checkinTime) }} · {{ checkinModeLabel }}</text>
+            <view class="cargo-checkin__facts">
+              <view v-if="context.geofenceEnabled">
+                <text class="driver-copy">围栏判定</text>
+                <text>{{ context.operation.insideGeofence ? "围栏内" : "围栏外" }}</text>
               </view>
-            </wd-button>
-          </view>
-        </view>
-
-        <view v-if="!checkinOnly" class="form-card card">
-          <view class="form-card__header">
-            <view>
-              <text class="section-kicker">现场资料</text>
-              <text class="section-title">补齐{{ title }}信息</text>
-            </view>
-            <text v-if="isCompleted" class="form-card__completed">已完成</text>
-          </view>
-
-          <view v-if="!context.operation" class="form-card__locked">
-            <view class="form-card__locked-icon"
-              ><TmsIcon name="location" size="30rpx"
-            /></view>
-            <view>
-              <strong>完成定位后填写资料</strong>
-              <text>定位打卡成功后，重量与凭证上传会自动启用</text>
-            </view>
-          </view>
-
-          <view class="field-block">
-            <text class="field-block__label"
-              >{{ title }}净重（吨）<text class="required-mark">*</text></text
-            >
-            <view class="weight-input">
-              <wd-input
-                v-model="form.weightTon"
-                type="digit"
-                inputmode="decimal"
-                compact
-                aria-label="净重，单位吨"
-                :disabled="!context.operation"
-                :readonly="isCompleted"
-                :placeholder="`请输入${title}净重`"
-              />
-              <text>吨</text>
-            </view>
-            <text class="field-block__help"
-              >必填，以最终确认的实际净重为准，最多保留 3 位小数</text
-            >
-          </view>
-
-          <view class="weight-grid">
-            <view class="field-block weight-grid__item">
-              <text class="field-block__label">毛重（吨）</text>
-              <view class="weight-input">
-                <wd-input
-                  v-model="form.grossWeightTon"
-                  type="digit"
-                  inputmode="decimal"
-                  compact
-                  aria-label="毛重，单位吨"
-                  :disabled="!context.operation"
-                  :readonly="isCompleted"
-                  placeholder="选填"
-                />
-                <text>吨</text>
+              <view>
+                <text class="driver-copy">{{ context.geofenceEnabled ? "距中心" : "定位用途" }}</text>
+                <text>{{ context.geofenceEnabled ? Math.round(context.operation.distanceM) + " 米" : "仅留痕" }}</text>
+              </view>
+              <view>
+                <text class="driver-copy">定位精度</text>
+                <text>{{ context.operation.locationAccuracyM ? "约 " + Math.round(context.operation.locationAccuracyM) + " 米" : "—" }}</text>
               </view>
             </view>
-            <view class="field-block weight-grid__item">
-              <text class="field-block__label">皮重（吨）</text>
-              <view class="weight-input">
-                <wd-input
-                  v-model="form.tareWeightTon"
-                  type="digit"
-                  inputmode="decimal"
-                  compact
-                  aria-label="皮重，单位吨"
-                  :disabled="!context.operation"
-                  :readonly="isCompleted"
-                  placeholder="选填"
-                />
-                <text>吨</text>
-              </view>
-            </view>
-          </view>
-          <view v-if="calculatedNetWeight !== null" class="weight-check">
-            <text>毛重－皮重</text>
-            <strong>{{ calculatedNetWeight }} 吨</strong>
-          </view>
-          <text v-if="weightDifferenceWarning" class="weight-warning">
-            {{ weightDifferenceWarning }}
-          </text>
-
-          <view class="field-block">
-            <text class="field-block__label"
-              >{{ title }}照片<text class="required-mark">*</text></text
-            >
-            <text class="field-block__help"
-              >建议拍摄车辆、货物与现场环境，确保车牌无遮挡</text
-            >
-            <view class="evidence-grid">
-              <view
-                v-for="(url, index) in form.photoUrls"
-                :key="url"
-                class="evidence-grid__item"
-              >
-                <button
-                  class="tms-evidence-preview"
-                  :aria-label="`预览第 ${index + 1} 张${title}照片`"
-                  @click="preview(url, form.photoUrls)"
-                >
-                  <image :src="url" mode="aspectFill" />
-                </button>
-                <button
-                  v-if="!isCompleted"
-                  class="tms-evidence-remove"
-                  :aria-label="`删除第 ${index + 1} 张${title}照片`"
-                  :disabled="!!state.uploading || state.submitting"
-                  @click="removeEvidence('photo', index)"
-                >
-                  ×
-                </button>
-              </view>
-              <button
-                v-if="!isCompleted && form.photoUrls.length < 5"
-                class="evidence-grid__add"
-                :disabled="!context.operation || !!state.uploading"
-                @click="uploadEvidence('photo')"
-              >
-                <wd-loading
-                  v-if="state.uploading === 'photo'"
-                  type="circular"
-                  color="var(--tms-primary)"
-                  size="30rpx"
-                />
-                <view v-else class="evidence-grid__add-content">
-                  <TmsIcon name="camera" size="42rpx" />
-                  <text>上传照片</text>
-                </view>
-              </button>
-            </view>
-            <text class="field-block__quota"
-              >已上传 {{ form.photoUrls.length }}/5 张</text
-            >
-          </view>
-
-          <view class="field-block">
-            <text class="field-block__label"
-              >{{ title }}磅单<text class="required-mark">*</text></text
-            >
-            <text class="field-block__help"
-              >请拍摄完整磅单，重量、日期和单号应清晰可见</text
-            >
-            <view class="evidence-grid">
-              <view
-                v-for="(url, index) in form.weighbridgeTicketUrls"
-                :key="url"
-                class="evidence-grid__item"
-              >
-                <button
-                  class="tms-evidence-preview"
-                  :aria-label="`预览第 ${index + 1} 张${title}磅单`"
-                  @click="preview(url, form.weighbridgeTicketUrls)"
-                >
-                  <image :src="url" mode="aspectFill" />
-                </button>
-                <button
-                  v-if="!isCompleted"
-                  class="tms-evidence-remove"
-                  :aria-label="`删除第 ${index + 1} 张${title}磅单`"
-                  :disabled="!!state.uploading || state.submitting"
-                  @click="removeEvidence('ticket', index)"
-                >
-                  ×
-                </button>
-              </view>
-              <button
-                v-if="!isCompleted && form.weighbridgeTicketUrls.length < 3"
-                class="evidence-grid__add"
-                :disabled="!context.operation || !!state.uploading"
-                @click="uploadEvidence('ticket')"
-              >
-                <wd-loading
-                  v-if="state.uploading === 'ticket'"
-                  type="circular"
-                  color="var(--tms-primary)"
-                  size="30rpx"
-                />
-                <view v-else class="evidence-grid__add-content">
-                  <TmsIcon name="camera" size="42rpx" />
-                  <text>上传磅单</text>
-                </view>
-              </button>
-            </view>
-            <text class="field-block__quota"
-              >已上传 {{ form.weighbridgeTicketUrls.length }}/3 张</text
-            >
-          </view>
-
-          <view class="recognition-card" :class="{ 'is-stale': recognitionIsStale }">
-            <view class="recognition-card__head">
-              <view class="recognition-card__identity">
-                <view class="recognition-card__icon">
-                  <TmsIcon name="document" size="28rpx" />
-                </view>
-                <view>
-                  <strong>识别信息</strong>
-                  <text>保留 OCR 原始文本，识别错误也不会写入备注</text>
-                </view>
-              </view>
-              <button
-                v-if="!isCompleted"
-                class="recognition-card__action"
-                :disabled="
-                  !context.operation ||
-                  !form.weighbridgeTicketUrls.length ||
-                  state.analyzing ||
-                  !!state.uploading
-                "
-                @click="analyzeWeighbridgeTicket"
-              >
-                <view class="tms-inline-action">
-                  <wd-loading
-                    v-if="state.analyzing"
-                    type="circular"
-                    color="var(--tms-primary)"
-                    size="24rpx"
-                  />
-                  <TmsIcon v-else name="camera" size="24rpx" />
-                  <text>{{ form.recognitionInfo ? "重新识别" : "识别磅单" }}</text>
-                </view>
-              </button>
-            </view>
-            <view v-if="form.recognitionInfo" class="recognition-card__result">
-              <view class="recognition-card__result-meta">
-                <text>
-                  {{
-                    recognitionConfidence === null
-                      ? "OCR 原文"
-                      : `OCR 原文 · 可信度 ${recognitionConfidence}%`
-                  }}
-                </text>
-                <text v-if="recognitionIsStale" class="recognition-card__stale">
-                  磅单已变更，请重新识别
-                </text>
-              </view>
-              <text class="recognition-card__raw">{{ form.recognitionInfo }}</text>
-              <text v-if="recognitionWarnings.length" class="recognition-card__warning">
-                {{ recognitionWarnings.slice(0, 3).join("；") }}
-              </text>
-              <text class="recognition-card__notice">
-                识别内容仅供备查；毛重、皮重和净重以司机最终确认值为准。
-              </text>
-            </view>
-            <text v-else class="recognition-card__empty">
-              上传磅单后可进行识别。未识别或识别失败不影响手工填写和提交。
+            <text v-if="context.operation.outsideReason" class="driver-copy">
+              围栏外打卡原因：{{ context.operation.outsideReason }}
             </text>
           </view>
-
-          <view class="field-block">
-            <text class="field-block__label">备注</text>
-            <wd-textarea
-              v-model="form.remark"
-              custom-class="tms-form-textarea"
-              aria-label="装卸货备注"
-              :disabled="!context.operation"
-              :readonly="isCompleted"
-              :maxlength="300"
-              placeholder="可填写货损、磅差或现场说明"
-            />
-            <text class="field-block__count">{{ form.remark.length }}/300</text>
-          </view>
+          <template v-else>
+            <view class="cargo-policy">
+              <text class="cargo-policy__title">
+                {{ policyLabel }}<text v-if="context.geofenceEnabled"> · {{ context.radiusM }} 米</text>
+              </text>
+              <text class="driver-copy">{{ policyHint }}</text>
+            </view>
+            <MobileAction
+              class="mobile-dock__action tms-primary-action"
+              :disabled="state.locating"
+              :aria-busy="state.locating"
+              @click="handleCheckIn"
+            >
+              <TmsIcon name="location" size="18px" />
+              <text>{{ state.locating ? "正在获取定位…" : "获取定位并打卡" }}</text>
+            </MobileAction>
+          </template>
         </view>
-      </view>
-    </scroll-view>
 
-    <view
-      v-if="context?.operation && !isCompleted && !checkinOnly"
-      class="operation-footer safe-bottom"
-    >
-      <view>
-        <text>{{
-          submitMissing.length
-            ? `还需补充：${submitMissing.join("、")}`
-            : "资料已完整，可以提交"
-        }}</text>
-        <strong>{{
-          submitMissing.length ? "请完成必填项" : `确认${title}完成`
-        }}</strong>
+        <view v-if="!checkinOnly && !context.operation" class="driver-card cargo-locked">
+          <TmsIcon name="lock" size="18px" />
+          <text class="driver-copy">完成定位打卡后，填写净重并上传{{ title }}照片和磅单。</text>
+        </view>
+
+        <template v-if="!checkinOnly && context.operation">
+          <view class="driver-card driver-stack" aria-labelledby="cargo-weight-title">
+            <text id="cargo-weight-title" class="section-title" role="heading" aria-level="2">{{ title }}重量</text>
+            <MobileField
+              v-model="form.weightTon"
+              field="cargo-net-weight"
+              :label="title + '净重（吨）'"
+              inputmode="decimal"
+              placeholder="例如 12.5…"
+              :readonly="isCompleted"
+              :disabled="state.submitting"
+              required
+            />
+            <view class="cargo-weight-grid">
+              <MobileField
+                v-model="form.grossWeightTon"
+                field="cargo-gross-weight"
+                label="毛重（吨）"
+                inputmode="decimal"
+                placeholder="选填"
+                :readonly="isCompleted"
+                :disabled="state.submitting"
+              />
+              <MobileField
+                v-model="form.tareWeightTon"
+                field="cargo-tare-weight"
+                label="皮重（吨）"
+                inputmode="decimal"
+                placeholder="选填"
+                :readonly="isCompleted"
+                :disabled="state.submitting"
+              />
+            </view>
+            <text v-if="calculatedNetWeight !== null" class="driver-copy">毛重减皮重：{{ calculatedNetWeight }} 吨</text>
+            <text v-if="weightDifferenceWarning" class="cargo-weight-warning" role="status">{{ weightDifferenceWarning }}</text>
+          </view>
+
+          <view class="driver-card driver-stack" aria-labelledby="cargo-photo-title">
+            <view class="driver-heading">
+              <text id="cargo-photo-title" class="section-title" role="heading" aria-level="2">{{ title }}照片</text>
+              <text class="driver-copy">{{ form.photoUrls.length }}/5 张</text>
+            </view>
+            <text v-if="!isCompleted" class="driver-copy">拍摄车辆、货物与现场，确保车牌清晰。</text>
+            <MobileEvidence
+              :images="form.photoUrls"
+              :label="title + '照片'"
+              upload-label="上传照片"
+              :readonly="isCompleted"
+              :disabled="Boolean(state.uploading) || state.submitting"
+              :uploading="state.uploading === 'photo'"
+              @upload="uploadEvidence('photo')"
+              @preview="preview(form.photoUrls[$event], form.photoUrls)"
+              @remove="removeEvidence('photo', $event)"
+            />
+          </view>
+
+          <view class="driver-card driver-stack" aria-labelledby="cargo-ticket-title">
+            <view class="driver-heading">
+              <text id="cargo-ticket-title" class="section-title" role="heading" aria-level="2">{{ title }}磅单</text>
+              <text class="driver-copy">{{ form.weighbridgeTicketUrls.length }}/3 张</text>
+            </view>
+            <text v-if="!isCompleted" class="driver-copy">拍摄完整磅单，确保重量、日期和单号清晰。</text>
+            <MobileEvidence
+              :images="form.weighbridgeTicketUrls"
+              :label="title + '磅单'"
+              upload-label="上传磅单"
+              :limit="3"
+              :readonly="isCompleted"
+              :disabled="Boolean(state.uploading) || state.submitting || state.analyzing"
+              :uploading="state.uploading === 'ticket'"
+              @upload="uploadEvidence('ticket')"
+              @preview="preview(form.weighbridgeTicketUrls[$event], form.weighbridgeTicketUrls)"
+              @remove="removeEvidence('ticket', $event)"
+            />
+            <view v-if="form.recognitionInfo || (!isCompleted && form.weighbridgeTicketUrls.length)" class="cargo-ocr">
+              <view class="driver-heading">
+                <text class="cargo-ocr__title">磅单识别</text>
+                <MobileAction
+                  v-if="!isCompleted"
+                  class="driver-inline"
+                  :disabled="!form.weighbridgeTicketUrls.length || state.analyzing || Boolean(state.uploading) || state.submitting"
+                  @click="analyzeWeighbridgeTicket"
+                >
+                  {{ state.analyzing ? "识别中…" : form.recognitionInfo ? "重新识别" : "识别磅单" }}
+                </MobileAction>
+              </view>
+              <text v-if="recognitionIsStale" class="cargo-weight-warning">磅单已变更，请重新识别。</text>
+              <template v-if="form.recognitionInfo">
+                <text class="driver-copy">{{ recognitionConfidence === null ? "OCR 原文" : "OCR 原文 · 可信度 " + recognitionConfidence + "%" }}</text>
+                <text class="cargo-ocr__raw">{{ form.recognitionInfo }}</text>
+                <text v-if="recognitionWarnings.length" class="cargo-weight-warning">{{ recognitionWarnings.slice(0, 3).join("；") }}</text>
+                <text class="driver-copy">请核对识别结果，以最终填写的重量为准。</text>
+              </template>
+              <text v-else class="driver-copy">可识别磅单，也可以手动填写重量。</text>
+            </view>
+          </view>
+
+          <view class="driver-card">
+            <MobileField
+              v-model="form.remark"
+              field="cargo-remark"
+              label="现场备注"
+              :maxlength="300"
+              :readonly="isCompleted"
+              :disabled="state.submitting"
+              placeholder="选填，可注明货损或磅差…"
+              multiline
+            />
+          </view>
+        </template>
       </view>
-      <view class="operation-footer__button">
-        <wd-button
-          custom-class="tms-primary-action"
-          type="primary"
-          block
-          :round="false"
-          :loading="state.submitting"
-          loading-color="#ffffff"
+
+      <view
+        v-if="context?.operation && !isCompleted && !checkinOnly && !state.loading && !state.error"
+        class="mobile-dock operation-footer"
+        aria-label="装卸货提交操作"
+      >
+        <text v-if="submitMissing.length" class="mobile-dock__note">还需补充：{{ submitMissing.join("、") }}</text>
+        <MobileAction
+          class="mobile-dock__action tms-primary-action"
           :disabled="!canSubmit"
+          :aria-busy="state.submitting"
           @click="submit"
         >
-          提交{{ title }}信息
-        </wd-button>
+          {{ state.submitting ? "正在提交…" : "提交" + title + "信息" }}
+        </MobileAction>
       </view>
-    </view>
-  </view>
-</wd-config-provider>
+    </MobileWorkspace>
+  </wd-config-provider>
 </template>
 
 <style scoped lang="scss">
-.operation-page {
-  height: 100vh;
-  height: 100dvh;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.operation-page__hero {
-  flex: 0 0 auto;
-  color: #fff;
-  background: var(--tms-hero-gradient);
-}
-
-.operation-page__hero-main {
-  display: flex;
-  align-items: center;
-  gap: 20rpx;
-  padding: 22rpx 30rpx 34rpx;
-  border-top: 1rpx solid rgba(255, 255, 255, 0.14);
-}
-
-.operation-page__hero-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 82rpx;
-  height: 82rpx;
-  background: rgba(255, 255, 255, 0.18);
-  border-radius: 22rpx;
-}
-
-.operation-page__eyebrow,
-.operation-page__title,
-.operation-page__address {
-  display: block;
-}
-
-.operation-page__eyebrow {
-  font-size: max(20rpx, 12px);
-  font-weight: 700;
-  letter-spacing: 3rpx;
-  opacity: 0.78;
-}
-
-.operation-page__title {
-  margin-top: 4rpx;
-  font-size: 34rpx;
-  font-weight: 700;
-}
-
-.operation-page__address {
-  max-width: 550rpx;
-  margin-top: 6rpx;
-  overflow: hidden;
-  font-size: max(23rpx, 12px);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  opacity: 0.88;
-}
-
-.operation-page__scroll {
-  flex: 1;
-  min-height: 0;
-  height: auto;
-}
-
-.operation-page--with-footer .operation-page__scroll {
-  height: auto;
-}
-
-.operation-page__content {
-  display: flex;
-  flex-direction: column;
-  gap: 20rpx;
-  padding: 24rpx 26rpx 50rpx;
-}
-
-.policy-card,
-.checkin-card,
-.form-card {
-  padding: 28rpx;
-}
-
-.policy-card__header,
-.form-card__header,
-.checkin-card__status {
-  display: flex;
-  gap: 18rpx;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.section-kicker,
-.section-title {
-  display: block;
-}
-
-.section-kicker {
-  color: var(--tms-primary);
-  font-size: max(20rpx, 12px);
-  font-weight: 700;
-  letter-spacing: 2rpx;
-}
-
-.section-title {
-  margin-top: 5rpx;
-  color: var(--tms-text);
-  font-size: 30rpx;
-  font-weight: 700;
-}
-
-.policy-card__badge,
-.form-card__completed {
-  padding: 9rpx 18rpx;
-  color: var(--tms-primary);
-  background: var(--tms-primary-soft);
-  border-radius: 999rpx;
-  font-size: max(22rpx, 12px);
-  font-weight: 700;
-}
-
-.form-card__completed {
-  color: var(--tms-green);
-  background: #eaf9f2;
-}
-
-.policy-card__grid,
-.checkin-card__metrics {
+.cargo-checkin { display: flex; min-width: 0; align-items: center; gap: 10px; }
+.cargo-checkin__icon {
+  flex: none;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14rpx;
-  margin-top: 24rpx;
-}
-
-.policy-card__grid > view,
-.checkin-card__metrics > view {
-  padding: 18rpx;
-  background: var(--tms-panel);
-  border-radius: 12rpx;
-}
-
-.policy-card__grid text,
-.policy-card__grid strong,
-.checkin-card__metrics text,
-.checkin-card__metrics strong {
-  display: block;
-}
-
-.policy-card__grid text,
-.checkin-card__metrics text {
-  color: var(--tms-muted);
-  font-size: max(22rpx, 12px);
-}
-
-.policy-card__grid strong,
-.checkin-card__metrics strong {
-  margin-top: 8rpx;
-  color: var(--tms-text);
-  font-size: max(25rpx, 12px);
-}
-
-.policy-card__hint {
-  display: block;
-  margin-top: 20rpx;
-  color: var(--tms-muted);
-  font-size: max(23rpx, 12px);
-  line-height: 1.65;
-}
-
-.checkin-card {
-  border: 2rpx solid transparent;
-}
-
-.checkin-card.is-done {
-  border-color: rgba(37, 191, 117, 0.28);
-}
-
-.checkin-card__status {
-  justify-content: flex-start;
-}
-
-.checkin-card__icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 66rpx;
-  height: 66rpx;
-  color: var(--tms-primary);
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  color: var(--mobile-workspace-accent);
   background: var(--tms-primary-soft);
-  border-radius: 50%;
 }
-
-.checkin-card.is-done .checkin-card__icon {
-  color: var(--tms-green);
-  background: #eaf9f2;
-}
-
-.checkin-card__sub {
+.cargo-checkin__icon--done { color: var(--tms-green-strong); background: var(--tms-green-soft); }
+.cargo-checkin__heading { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.cargo-checkin__address { color: var(--mobile-workspace-ink); font-size: 16px; line-height: 1.45; overflow-wrap: anywhere; }
+.cargo-checkin__detail,
+.cargo-policy { display: grid; gap: 8px; }
+.cargo-checkin__facts { display: flex; flex-wrap: wrap; gap: 10px 20px; font-size: 14px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.cargo-checkin__facts > view { display: grid; gap: 2px; }
+.cargo-checkin__facts .driver-copy { font-weight: 400; }
+.cargo-policy, .cargo-ocr { padding-top: 10px; border-top: 1px solid var(--mobile-workspace-line); }
+.cargo-policy__title, .cargo-ocr__title { font-size: 14px; font-weight: 700; }
+.cargo-locked { display: flex; align-items: center; gap: 8px; color: var(--mobile-workspace-muted); }
+.cargo-weight-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.cargo-weight-warning { color: var(--tms-orange-strong); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.cargo-ocr { display: grid; gap: 8px; }
+.cargo-ocr__raw {
   display: block;
-  margin-top: 8rpx;
-  color: var(--tms-muted);
-  font-size: max(22rpx, 12px);
-}
-
-.checkin-card__metrics {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.checkin-card__button {
-  width: 100%;
-  margin-top: 26rpx;
-}
-
-.form-card__locked {
-  margin-top: 24rpx;
-  padding: 20rpx;
-  border: 1rpx solid var(--tms-primary-soft-strong);
-  border-radius: 18rpx;
-  color: var(--tms-primary-strong);
-  background: linear-gradient(135deg, #fff, var(--tms-primary-soft));
-  display: flex;
-  gap: 16rpx;
-  align-items: center;
-}
-
-.form-card__locked-icon {
-  flex: 0 0 auto;
-  width: 54rpx;
-  height: 54rpx;
-  border-radius: 16rpx;
-  color: var(--tms-primary);
-  background: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.form-card__locked strong,
-.form-card__locked text {
-  display: block;
-}
-
-.form-card__locked strong {
-  font-size: max(24rpx, 12px);
-}
-
-.form-card__locked text {
-  margin-top: 5rpx;
-  color: #6f7c91;
-  font-size: max(21rpx, 12px);
-}
-
-.field-block {
-  position: relative;
-  margin-top: 30rpx;
-}
-
-.field-block__label {
-  color: var(--tms-text);
-  font-size: max(26rpx, 14px);
-  font-weight: 700;
-}
-
-.field-block__help {
-  display: block;
-  margin-top: 8rpx;
-  color: var(--tms-muted);
-  font-size: max(21rpx, 12px);
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--tms-surface-soft);
+  color: var(--mobile-workspace-ink);
+  font-size: 13px;
   line-height: 1.5;
-}
-
-.field-block__quota {
-  display: block;
-  margin-top: 10rpx;
-  color: #8b95a8;
-  font-size: max(20rpx, 12px);
-  text-align: right;
-}
-
-.weight-input {
-  display: flex;
-  align-items: center;
-  height: var(--tms-control-height);
-  margin-top: 14rpx;
-  padding: 0 22rpx;
-  background: var(--tms-panel);
-  border: 2rpx solid var(--tms-line);
-  border-radius: var(--tms-control-radius);
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.weight-input :deep(.wd-input) {
-  flex: 1;
-  height: 100%;
-  width: 100%;
-  min-width: 0;
-}
-.weight-input :deep(.wd-input__inner) {
-  color: var(--tms-text);
-  font-size: max(28rpx, 12px);
-}
-
-.weight-input text {
-  color: var(--tms-muted);
-  font-weight: 700;
-}
-
-.weight-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16rpx;
-}
-
-.weight-grid__item {
-  min-width: 0;
-}
-
-.weight-grid .weight-input {
-  padding: 0 16rpx;
-}
-
-.weight-grid .weight-input :deep(.wd-input) {
-  min-width: 0;
-}
-
-.weight-check {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 16rpx;
-  padding: 16rpx 20rpx;
-  color: #52627a;
-  background: #f3f6fb;
-  border-radius: 14rpx;
-  font-size: max(22rpx, 12px);
-}
-
-.weight-check strong {
-  color: var(--tms-text);
-  font-size: max(24rpx, 12px);
-}
-
-.weight-warning {
-  display: block;
-  margin-top: 12rpx;
-  padding: 14rpx 18rpx;
-  color: #9a5d00;
-  background: #fff7e8;
-  border-left: 5rpx solid #f59e0b;
-  border-radius: 12rpx;
-  font-size: max(21rpx, 12px);
-  line-height: 1.55;
-}
-
-.recognition-card {
-  margin-top: 30rpx;
-  padding: 22rpx;
-  background: linear-gradient(145deg, #fff, var(--tms-primary-soft));
-  border: 1rpx solid var(--tms-primary-soft-strong);
-  border-radius: 18rpx;
-}
-
-.recognition-card.is-stale {
-  background: #fff9ef;
-  border-color: #f1d79e;
-}
-
-.recognition-card__head,
-.recognition-card__identity,
-.recognition-card__action,
-.recognition-card__result-meta {
-  display: flex;
-  align-items: center;
-}
-
-.recognition-card__head,
-.recognition-card__result-meta {
-  justify-content: space-between;
-  gap: 16rpx;
-}
-
-.recognition-card__identity {
-  min-width: 0;
-  gap: 14rpx;
-}
-
-.recognition-card__identity > view:last-child {
-  min-width: 0;
-}
-
-.recognition-card__icon {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 52rpx;
-  height: 52rpx;
-  color: var(--tms-primary);
-  background: #fff;
-  border-radius: 14rpx;
-}
-
-.recognition-card__identity strong,
-.recognition-card__identity text {
-  display: block;
-}
-
-.recognition-card__identity strong {
-  color: var(--tms-text);
-  font-size: max(24rpx, 12px);
-}
-
-.recognition-card__identity text {
-  margin-top: 4rpx;
-  color: var(--tms-muted);
-  font-size: max(20rpx, 12px);
-  line-height: 1.45;
-}
-
-.recognition-card__action {
-  flex: 0 0 auto;
-  justify-content: center;
-  gap: 7rpx;
-  min-width: 142rpx;
-  min-height: 64rpx;
-  margin: 0;
-  padding: 0 16rpx;
-  color: var(--tms-primary);
-  background: #fff;
-  border: 1rpx solid var(--tms-primary-soft-strong);
-  border-radius: 14rpx;
-  font-size: max(21rpx, 12px);
-}
-
-.recognition-card__action::after {
-  border: 0;
-}
-
-.recognition-card__action[disabled] {
-  color: #99a3b5;
-  background: #f2f4f8;
-  border-color: #e0e4ec;
-  opacity: 1;
-}
-
-.recognition-card__result {
-  margin-top: 18rpx;
-}
-
-.recognition-card__result-meta {
-  color: #536586;
-  font-size: max(20rpx, 12px);
-}
-
-.recognition-card__stale {
-  color: #9a5d00;
-  font-weight: 700;
-}
-
-.recognition-card__raw {
-  display: block;
-  max-height: 320rpx;
-  margin-top: 10rpx;
-  padding: 18rpx;
-  overflow: auto;
-  color: #28364c;
-  background: rgba(255, 255, 255, 0.88);
-  border: 1rpx solid #dce3f3;
-  border-radius: 14rpx;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: max(21rpx, 12px);
-  line-height: 1.65;
-  overflow-wrap: anywhere;
   white-space: pre-wrap;
-}
-
-.recognition-card__warning,
-.recognition-card__notice,
-.recognition-card__empty {
-  display: block;
-  margin-top: 12rpx;
-  font-size: max(20rpx, 12px);
-  line-height: 1.55;
-}
-
-.recognition-card__warning {
-  color: #a15f00;
-}
-
-.recognition-card__notice,
-.recognition-card__empty {
-  color: var(--tms-muted);
-}
-
-.evidence-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14rpx;
-  margin-top: 16rpx;
-}
-
-.evidence-grid__item,
-.evidence-grid__add {
-  box-sizing: border-box;
-  position: relative;
-  width: 100%;
-  min-width: 0;
-  aspect-ratio: 1;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  background: var(--tms-panel);
-  border: 2rpx dashed #cfd6e5;
-  border-radius: 18rpx;
-}
-
-.evidence-grid__item image {
-  width: 100%;
-  height: 100%;
-}
-
-.evidence-grid__add {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--tms-primary);
-  font-size: max(22rpx, 12px);
-  line-height: 1;
-}
-
-.evidence-grid__add::after {
-  border: 0;
-}
-
-.evidence-grid__add-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8rpx;
-  line-height: 1;
-}
-
-.evidence-grid__add-content text {
-  display: block;
-  line-height: 1.2;
-}
-
-
-
-.field-block__count {
-  position: absolute;
-  right: 18rpx;
-  bottom: 14rpx;
-  color: var(--tms-light);
-  font-size: max(20rpx, 12px);
-}
-
-.operation-footer {
-  flex: 0 0 auto;
-  display: flex;
-  gap: 22rpx;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 136rpx;
-  padding: 18rpx 26rpx;
-  background: #fff;
-  border-top: 1rpx solid var(--tms-line);
-  box-shadow: 0 -10rpx 28rpx rgba(30, 41, 66, 0.07);
-}
-
-.operation-footer text,
-.operation-footer strong {
-  display: block;
-}
-
-.operation-footer text {
-  color: var(--tms-muted);
-  font-size: max(21rpx, 12px);
-}
-
-.operation-footer strong {
-  margin-top: 4rpx;
-  color: var(--tms-text);
-  font-size: max(26rpx, 12px);
-}
-
-.operation-footer__button {
-  width: 310rpx;
+  overflow-wrap: anywhere;
 }
 </style>

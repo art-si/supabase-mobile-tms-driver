@@ -16,6 +16,11 @@
     "audit:expense-layout": "node scripts/expense-layout-audit.mjs"
   },
   "dependencies": {
+    "@capacitor/app": "8.1.2",
+    "@capacitor/browser": "8.0.5",
+    "@capacitor/core": "8.6.0",
+    "@capacitor/geolocation": "8.2.4",
+    "@capacitor/synapse": "1.0.4",
     "@dcloudio/uni-app": "3.0.0-alpha-1000920260626810",
     "@dcloudio/uni-cloud": "3.0.0-alpha-1000920260626810",
     "@dcloudio/uni-components": "3.0.0-alpha-1000920260626810",
@@ -31,6 +36,8 @@
     "vue": "3.4.21"
   },
   "devDependencies": {
+    "@capacitor/android": "8.6.0",
+    "@capacitor/cli": "8.6.0",
     "@dcloudio/types": "3.4.31",
     "@dcloudio/uni-cli-shared": "3.0.0-alpha-1000920260626810",
     "@dcloudio/vite-plugin-uni": "3.0.0-alpha-1000920260626810",

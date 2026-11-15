@@ -1,3 +1,4 @@
+import { formatCnyAmount } from '@mobile-core/money'
 import type { WaybillStatus } from '@/api/types'
 
 export const STATUS_LABEL: Record<WaybillStatus, string> = {
@@ -53,11 +54,7 @@ export function formatKm(value?: number) {
 }
 
 export function formatMoney(value?: number) {
-  if (value === undefined || value === null) return '¥0.00'
-  return `¥${Number(value).toLocaleString('zh-CN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  })}`
+  return formatCnyAmount(value ?? 0)
 }
 
 export function formatTon(value?: number) {

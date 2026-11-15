@@ -37,8 +37,8 @@ const accessibleWaybills = new Map()
 const activeRequests = new Map()
 const readySelectors = {
   home: '.home-page__content',
-  waybill: '.waybill-page__stack, .waybill-page__empty',
-  detail: '.detail-page__content',
+  waybill: '.route-card--list .route-card__open, .driver-empty',
+  detail: '.route-card--detail',
   'cargo-loading': '.operation-page__content',
   'cargo-unloading': '.operation-page__content',
   'execution-departure': '.execution-page__content',
@@ -151,7 +151,7 @@ async function capture(name, path) {
     await page.waitForTimeout(5000)
     settledImage = join(output, `${width}-${name}-settled.png`)
     await page.screenshot({ path: settledImage })
-    settledVehicleLabels = await page.locator('.status-card__row').allTextContents()
+    settledVehicleLabels = await page.locator('.vehicle-specs .mobile-row').allTextContents()
   }
 
   results.push({ name, url: page.url(), layout, buttons, evidence, topImage, bottomImage, settledImage, settledVehicleLabels })

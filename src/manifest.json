@@ -28,6 +28,7 @@
     }
   },
   "mp-weixin": {
+    "mergeVirtualHostAttributes": true,
     "appid": "wx024c76d6303e71c6",
     "permission": {
       "scope.userLocation": {

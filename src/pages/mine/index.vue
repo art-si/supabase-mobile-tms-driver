@@ -1,8 +1,12 @@
 <script setup lang="ts">
+import MobileWorkspace from '@mobile-core/components/MobileWorkspace.vue'
 import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import TmsBottomNav from '@/components/business/TmsBottomNav.vue'
 import TmsIcon from '@/components/business/TmsIcon.vue'
+import MobileAction from '@mobile-core/components/MobileAction.vue'
+import MobileTopBar from '@mobile-core/components/MobileTopBar.vue'
+import type { MobileIconName } from '@mobile-core/icons'
 import MobileMetricGrid from '@mobile-core/components/MobileMetricGrid.vue'
 import TmsPageSkeleton from '@mobile-core/components/TmsPageSkeleton.vue'
 import { getUserFacingErrorMessage } from '@/api/supabase'
@@ -27,14 +31,27 @@ const openingExpense = ref(false)
 const helpVisible = ref(false)
 const contactNoticeVisible = ref(false)
 const logoutConfirmVisible = ref(false)
-const serviceButtonStyle = 'width: 100%; height: 132rpx; min-height: 132rpx; padding: 0; font-size: max(26rpx, 12px); line-height: 1.3; background: transparent; border: 0;'
 const showSkeleton = computed(() => !profile.summary && (initialLoading.value || Boolean(loadError.value)))
+
+type PopupPanel = HTMLElement | { $el: HTMLElement }
+const helpPanel = ref<PopupPanel>()
+const contactPanel = ref<PopupPanel>()
+const logoutPanel = ref<PopupPanel>()
+let popupTrigger: HTMLElement | null = null
+let activePopup: HTMLElement | undefined
 
 const metrics = computed(() => [
   { label: '运输次数', value: profile.summary?.completedCount ?? 0 },
   { label: '运输里程', value: profile.summary?.totalMileageKm ?? 0, unit: 'km' },
   { label: '服务评分', value: profile.summary?.rating || '--' }
 ])
+
+const services: readonly { label: string; icon: MobileIconName; open: () => void }[] = [
+  { label: '费用记录', icon: 'expense', open: openExpense },
+  { label: '电子回单', icon: 'receipt', open: openCompletedWaybills },
+  { label: '联系车队', icon: 'phone', open: contactCarrier },
+  { label: '使用说明', icon: 'help', open: () => { helpVisible.value = true } }
+]
 
 const displayName = computed(
   () => driver.value?.driverName || user.value?.nickName || user.value?.userName || '司机师傅'
@@ -106,6 +123,48 @@ function openSettings() {
   uni.navigateTo({ url: '/pages/settings/index' })
 }
 
+function rememberPopupTrigger() {
+  // #ifdef H5
+  popupTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  // #endif
+}
+
+function focusPopup(panel: PopupPanel | undefined, close: () => void) {
+  // #ifdef H5
+  activePopup = panel instanceof HTMLElement ? panel : panel?.$el
+  if (!activePopup) return
+  activePopup.onkeydown = event => handlePopupKeydown(event, close)
+  activePopup.querySelector<HTMLElement>('[tabindex="0"]')?.focus()
+  // #endif
+}
+
+function handlePopupKeydown(event: KeyboardEvent, close: () => void) {
+  // #ifdef H5
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    event.stopPropagation()
+    close()
+    return
+  }
+  if (event.key !== 'Tab') return
+  if (!(event.currentTarget instanceof HTMLElement)) return
+  const buttons = event.currentTarget.querySelectorAll<HTMLElement>('[tabindex="0"]')
+  const first = buttons[0]
+  const last = buttons[buttons.length - 1]
+  if (event.shiftKey ? event.target !== first : event.target !== last) return
+  event.preventDefault()
+  const next = event.shiftKey ? last : first
+  next?.focus()
+  // #endif
+}
+
+function restorePopupTrigger() {
+  if (activePopup) activePopup.onkeydown = null
+  activePopup = undefined
+  if (popupTrigger?.isConnected) popupTrigger.focus({ preventScroll: true })
+  popupTrigger = null
+}
+
 async function confirmLogout() {
   logoutConfirmVisible.value = false
   try {
@@ -118,697 +177,261 @@ async function confirmLogout() {
 </script>
 
 <template>
-<wd-config-provider :theme="themeName">
-  <view class="mine-page page safe-bottom">
-    <scroll-view scroll-y class="mine-page__scroll">
-    <view class="mine-page__hero">
-      <view class="mine-page__mesh" />
-      <view class="mine-page__ambient" />
-      <view class="mine-page__eyebrow"><text /> 司机档案</view>
-      <text v-if="showSkeleton" class="mine-page__loading">正在同步司机档案…</text>
-      <view v-else class="mine-page__user">
-        <view class="mine-page__avatar mine-page__avatar--text">
-          <text v-if="!avatarReady">{{ avatarInitial }}</text>
-          <image
-            v-if="avatarSrc"
-            class="mine-page__avatar-image"
-            :class="{ 'mine-page__avatar-image--ready': avatarReady }"
-            :src="avatarSrc"
-            mode="aspectFill"
-            :aria-label="`${displayName}的头像`"
-            @load="avatarLoadedUrl = avatarSrc"
-          />
-        </view>
-        <view class="mine-page__profile">
-          <text class="mine-page__name">{{ displayName }}</text>
-          <text class="mine-page__company">
-            {{ carrier?.companyName || '暂未绑定承运商' }}
-          </text>
-          <view class="mine-page__verified"><TmsIcon name="success" size="24rpx" /> 司机档案已同步</view>
-        </view>
-        <wd-button
-          aria-label="刷新司机档案"
-          custom-style="width: 88rpx; min-width: 44px; height: 88rpx; min-height: 44px; margin: 0; padding: 0; border-radius: 50%; background: rgba(255,255,255,0.14); border: 2rpx solid rgba(255,255,255,0.22); color: #fff; display: flex; align-items: center; justify-content: center;"
-          :disabled="syncing"
-          @click="refreshProfile"
-        >
-          <TmsIcon name="refresh" size="36rpx" />
-        </wd-button>
-      </view>
-    </view>
+  <wd-config-provider :theme="themeName">
+    <MobileWorkspace class="page driver-page">
+      <MobileTopBar title="我的" capsule="always" />
 
-    <TmsPageSkeleton
-      v-if="showSkeleton"
-      label="正在同步司机档案…"
-      :error="loadError"
-      @retry="load"
-    />
-    <view v-else class="mine-page__content">
-      <view class="mine-card card">
-        <view class="section-head">
+      <view class="driver-content driver-content--tabbed">
+        <TmsPageSkeleton
+          v-if="showSkeleton"
+          label="正在同步司机档案…"
+          :error="loadError"
+          @retry="load"
+        />
+        <view v-else class="mine-page__content">
+          <view class="driver-card mine-identity">
+            <view class="mine-identity__avatar" aria-hidden="true">
+              <text v-if="!avatarReady">{{ avatarInitial }}</text>
+              <image
+                v-if="avatarSrc"
+                class="mine-identity__photo"
+                :class="{ 'mine-identity__photo--ready': avatarReady }"
+                :src="avatarSrc"
+                mode="aspectFill"
+                @load="avatarLoadedUrl = avatarSrc"
+              />
+            </view>
+            <view class="mobile-row__body">
+              <text class="mine-identity__name">{{ displayName }}</text>
+              <text class="mobile-row__detail">{{ carrier?.companyName || '暂未绑定承运商' }}</text>
+            </view>
+            <MobileAction
+              class="mine-icon-button"
+              :aria-label="syncing ? '正在刷新司机档案' : '刷新司机档案'"
+              :disabled="syncing"
+              @click="refreshProfile"
+            >
+              <TmsIcon name="refresh" size="18px" />
+            </MobileAction>
+          </view>
+
           <view>
-            <text class="section-eyebrow">运输数据</text>
-            <text class="section-title">履约表现</text>
+            <text class="mobile-group-title" role="heading" aria-level="2">常用服务</text>
+            <view class="mobile-group">
+              <MobileAction
+                v-for="service in services"
+                :key="service.icon"
+                class="mobile-row"
+                :disabled="service.icon === 'expense' && openingExpense"
+                @click="service.open"
+              >
+                <view class="mobile-row__icon" aria-hidden="true">
+                  <TmsIcon :name="service.icon" size="17px" />
+                </view>
+                <view class="mobile-row__body">
+                  <text class="mobile-row__label">{{ service.label }}</text>
+                </view>
+                <TmsIcon class="mobile-row__chevron" name="chevron" size="14px" aria-hidden="true" />
+              </MobileAction>
+            </view>
           </view>
-          <text class="section-head__hint">累计数据</text>
-        </view>
-        <view class="mine-card__metrics">
-          <MobileMetricGrid :items="metrics" />
-        </view>
-      </view>
 
-      <view class="mine-card card">
-        <view class="section-head">
           <view>
-            <text class="section-eyebrow">隐私资料</text>
-            <text class="section-title">账户信息</text>
+            <text class="mobile-group-title" role="heading" aria-level="2">履约表现</text>
+            <MobileMetricGrid :items="metrics" />
           </view>
-          <text class="section-head__hint">隐私保护</text>
-        </view>
-        <view class="account-list">
-          <view class="account-list__row">
-            <text>手机号</text>
-            <text>{{ maskPhone(driver?.phone || user?.userPhone) }}</text>
-          </view>
-          <view class="account-list__row">
-            <text>身份证号</text>
-            <text>{{ maskIdCard(driver?.idCardNo) }}</text>
-          </view>
-          <view class="account-list__row">
-            <text>准驾车型</text>
-            <text>{{ driver?.licenseType || '--' }}</text>
-          </view>
-        </view>
-      </view>
 
-      <view class="mine-card card">
-        <view class="section-head">
           <view>
-            <text class="section-eyebrow">偏好设置</text>
-            <text class="section-title">设置</text>
+            <text class="mobile-group-title" role="heading" aria-level="2">账户信息</text>
+            <view class="mobile-group">
+              <view class="mobile-row mobile-row--static">
+                <view class="mobile-row__body"><text class="mobile-row__label">手机号</text></view>
+                <text class="mobile-row__trailing mobile-row__detail mobile-row__value">{{ maskPhone(driver?.phone || user?.userPhone) }}</text>
+              </view>
+              <view class="mobile-row mobile-row--static">
+                <view class="mobile-row__body"><text class="mobile-row__label">身份证号</text></view>
+                <text class="mobile-row__trailing mobile-row__detail mobile-row__value">{{ maskIdCard(driver?.idCardNo) }}</text>
+              </view>
+              <view class="mobile-row mobile-row--static">
+                <view class="mobile-row__body"><text class="mobile-row__label">准驾车型</text></view>
+                <text class="mobile-row__trailing mobile-row__detail mobile-row__value">{{ driver?.licenseType || '--' }}</text>
+              </view>
+            </view>
           </view>
-          <text class="section-head__hint">按习惯调整</text>
-        </view>
-        <button class="mine-settings-link" aria-label="打开设置，管理主题配色" @tap="openSettings">
-          <view class="mine-settings-link__icon" aria-hidden="true"><TmsIcon name="settings" size="34rpx" /></view>
-          <view class="mine-settings-link__copy">
-            <text class="mine-settings-link__title">主题配色</text>
-            <text class="mine-settings-link__description">管理全局外观</text>
-          </view>
-          <view class="mine-settings-link__chevron">
-            <TmsIcon name="arrow-right" size="28rpx" />
-          </view>
-        </button>
-      </view>
 
-      <view class="mine-card card">
-        <view class="section-head">
-          <view>
-            <text class="section-eyebrow">快捷入口</text>
-            <text class="section-title">常用服务</text>
+          <view class="mobile-group">
+            <MobileAction class="mobile-row" aria-label="打开设置，管理主题配色" @click="openSettings">
+              <view class="mobile-row__icon" aria-hidden="true"><TmsIcon name="settings" size="17px" /></view>
+              <view class="mobile-row__body"><text class="mobile-row__label">主题配色</text></view>
+              <TmsIcon class="mobile-row__chevron" name="chevron" size="14px" aria-hidden="true" />
+            </MobileAction>
+            <MobileAction class="mobile-row mine-page__logout" @click="logoutConfirmVisible = true">
+              <text class="mobile-row__label">退出登录</text>
+            </MobileAction>
           </view>
-        </view>
-        <view class="feature-grid">
-          <wd-button variant="text" custom-class="feature-grid__item" :custom-style="serviceButtonStyle" :disabled="openingExpense" @click="openExpense">
-            <view class="feature-grid__icon"><TmsIcon name="expense" size="46rpx" /></view>
-            <text>费用记录</text>
-          </wd-button>
-          <wd-button variant="text" custom-class="feature-grid__item" :custom-style="serviceButtonStyle" @click="openCompletedWaybills">
-            <view class="feature-grid__icon"><TmsIcon name="receipt" size="46rpx" /></view>
-            <text>电子回单</text>
-          </wd-button>
-          <wd-button variant="text" custom-class="feature-grid__item" :custom-style="serviceButtonStyle" @click="contactCarrier">
-            <view class="feature-grid__icon"><TmsIcon name="support" size="46rpx" /></view>
-            <text>联系车队</text>
-          </wd-button>
-          <wd-button variant="text" custom-class="feature-grid__item" :custom-style="serviceButtonStyle" @click="helpVisible = true">
-            <view class="feature-grid__icon"><TmsIcon name="help" size="46rpx" /></view>
-            <text>使用说明</text>
-          </wd-button>
         </view>
       </view>
 
-      <wd-button custom-class="mine-page__logout" type="danger" variant="soft" block @click="logoutConfirmVisible = true">退出登录</wd-button>
-    </view>
-    </scroll-view>
+      <TmsBottomNav active="mine" />
 
-    <TmsBottomNav active="mine" />
-    <wd-popup v-model="helpVisible" position="bottom" round safe-area-inset-bottom :z-index="60" custom-class="mine-help">
-      <view class="mine-help__panel">
-        <view class="mine-help__head">
-          <view>
-            <text class="section-eyebrow">运输流程</text>
-            <text class="section-title">使用说明</text>
+      <wd-popup v-model="helpVisible" position="bottom" round :z-index="60"
+        custom-style="padding-bottom:var(--mobile-safe-bottom,0px);"
+        @before-enter="rememberPopupTrigger" @after-enter="focusPopup(helpPanel, () => helpVisible = false)" @after-leave="restorePopupTrigger"
+      >
+        <view ref="helpPanel" class="mine-help__panel" role="dialog" aria-modal="true" aria-label="使用说明">
+          <view class="driver-heading">
+            <text class="section-title" role="heading" aria-level="2">使用说明</text>
+            <MobileAction class="mine-icon-button" aria-label="关闭使用说明" @click="helpVisible = false">
+              <TmsIcon name="close" size="16px" />
+            </MobileAction>
           </view>
-          <wd-button variant="text" custom-class="mine-help__close" aria-label="关闭使用说明" @click="helpVisible = false">
-            <TmsIcon name="close" size="28rpx" />
-          </wd-button>
+          <view class="mine-help__steps">
+            <view><text>1</text><text>在运单列表核对站点与货物信息，接受任务。</text></view>
+            <view><text>2</text><text>到达装货地打卡，填写重量并上传照片与磅单。</text></view>
+            <view><text>3</text><text>录入发车信息。到达后完成卸货、签收和回单上传。</text></view>
+            <view><text>4</text><text>录入收车里程与车辆照片。垫付费用可在运单内上报。</text></view>
+          </view>
+          <MobileAction class="tms-primary-action mine-modal-action mine-help__done" @click="helpVisible = false">我知道了</MobileAction>
         </view>
-        <view class="mine-help__steps">
-          <view><text>01</text><text>在运单列表核对站点与货物信息，接受任务。</text></view>
-          <view><text>02</text><text>到达装货地打卡，填写重量并上传照片与磅单。</text></view>
-          <view><text>03</text><text>录入发车信息；到达后完成卸货、签收及回单上传。</text></view>
-          <view><text>04</text><text>录入收车里程与车辆照片；垫付费用可在运单内上报。</text></view>
+      </wd-popup>
+
+      <wd-popup v-model="contactNoticeVisible" position="center" round :z-index="70"
+        @before-enter="rememberPopupTrigger" @after-enter="focusPopup(contactPanel, () => contactNoticeVisible = false)" @after-leave="restorePopupTrigger"
+      >
+        <view ref="contactPanel" class="mine-dialog__body" role="alertdialog" aria-modal="true" aria-label="联系车队">
+          <text class="section-title" role="heading" aria-level="2">联系车队</text>
+          <text class="driver-copy">当前承运商尚未配置联系电话，请联系车队管理员。</text>
+          <MobileAction class="tms-primary-action mine-modal-action" @click="contactNoticeVisible = false">我知道了</MobileAction>
         </view>
-        <wd-button type="primary" custom-class="tms-primary-action mine-help__done" block @click="helpVisible = false">我知道了</wd-button>
-      </view>
-    </wd-popup>
-    <wd-popup v-model="contactNoticeVisible" position="center" round :z-index="70" custom-class="mine-dialog">
-      <view class="mine-dialog__body" role="alertdialog" aria-label="联系车队">
-        <text class="mine-dialog__title">联系车队</text>
-        <text class="mine-dialog__message">当前承运商尚未配置联系电话，请联系车队管理员。</text>
-        <wd-button type="primary" block @click="contactNoticeVisible = false">我知道了</wd-button>
-      </view>
-    </wd-popup>
-    <wd-popup v-model="logoutConfirmVisible" position="center" round :z-index="70" custom-class="mine-dialog">
-      <view class="mine-dialog__body" role="alertdialog" aria-label="退出登录">
-        <text class="mine-dialog__title">退出登录</text>
-        <text class="mine-dialog__message">确认退出当前账号吗？</text>
-        <view class="mine-dialog__actions">
-          <wd-button variant="plain" type="primary" @click="logoutConfirmVisible = false">取消</wd-button>
-          <wd-button type="danger" @click="confirmLogout">退出登录</wd-button>
+      </wd-popup>
+
+      <wd-popup v-model="logoutConfirmVisible" position="center" round :z-index="70"
+        @before-enter="rememberPopupTrigger" @after-enter="focusPopup(logoutPanel, () => logoutConfirmVisible = false)" @after-leave="restorePopupTrigger"
+      >
+        <view ref="logoutPanel" class="mine-dialog__body" role="alertdialog" aria-modal="true" aria-label="退出登录">
+          <text class="section-title" role="heading" aria-level="2">退出登录</text>
+          <text class="driver-copy">确认退出当前账号吗？</text>
+          <view class="mine-dialog__actions">
+            <MobileAction class="tms-secondary-action mine-modal-action" @click="logoutConfirmVisible = false">取消</MobileAction>
+            <MobileAction class="tms-danger-action mine-modal-action" @click="confirmLogout">退出登录</MobileAction>
+          </view>
         </view>
-      </view>
-    </wd-popup>
-  </view>
-</wd-config-provider>
+      </wd-popup>
+    </MobileWorkspace>
+  </wd-config-provider>
 </template>
 
 <style scoped lang="scss">
-.mine-page {
-  height: 100vh;
-  height: 100dvh;
-  padding-bottom: var(--tms-tabbar-space);
-  overflow: hidden;
-  background: var(--tms-bg);
-  display: flex;
-  flex-direction: column;
-}
-
-.mine-page__scroll {
-  flex: 1;
-  min-height: 0;
-  height: auto;
-}
-
-.mine-page__hero {
-  position: relative;
-  height: 362rpx;
-  padding: calc(46rpx + env(safe-area-inset-top)) 32rpx 100rpx;
-  overflow: hidden;
-  color: #fff;
-  background: var(--tms-hero-gradient);
-  border-bottom-left-radius: 46rpx;
-  border-bottom-right-radius: 46rpx;
-}
-
-/* #ifdef MP-WEIXIN */
-.mine-page__hero {
-  height: 410rpx;
-  padding-top: calc(94rpx + env(safe-area-inset-top));
-}
-/* #endif */
-
-.mine-page__hero::after {
-  position: absolute;
-  top: -240rpx;
-  right: -180rpx;
-  width: 520rpx;
-  height: 520rpx;
-  content: '';
-  border: 1rpx solid rgba(255, 255, 255, 0.12);
-  border-radius: 50%;
-  box-shadow:
-    0 0 0 70rpx rgba(255, 255, 255, 0.035),
-    0 0 0 140rpx rgba(255, 255, 255, 0.02);
-  pointer-events: none;
-}
-
-.mine-page__mesh {
-  position: absolute;
-  inset: 0;
-  opacity: 0.055;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.3) 1rpx, transparent 1rpx),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.3) 1rpx, transparent 1rpx);
-  background-size: 72rpx 72rpx;
-}
-
-.mine-page__ambient {
-  position: absolute;
-  right: -20rpx;
-  bottom: -170rpx;
-  width: 480rpx;
-  height: 300rpx;
-  border-radius: 50%;
-  background: rgba(var(--tms-primary-rgb), 0.24);
-  filter: blur(78rpx);
-}
-
-.mine-page__eyebrow {
-  position: relative;
-  z-index: 1;
-  margin-bottom: 34rpx;
-  display: flex;
-  align-items: center;
-  gap: 10rpx;
-  font-size: max(18rpx, 12px);
-  font-weight: 700;
-  opacity: 0.78;
-}
-
-.mine-page__eyebrow text {
-  width: 9rpx;
-  height: 9rpx;
-  border-radius: 50%;
-  background: #5eead4;
-  box-shadow: 0 0 0 6rpx rgba(94, 234, 212, 0.12);
-}
-
-.mine-page__loading {
-  position: relative;
-  z-index: 1;
-  display: block;
-  margin-top: 54rpx;
-  font-size: max(28rpx, 12px);
-  font-weight: 700;
-  line-height: 1.4;
-  opacity: 0.9;
-}
-
-.mine-page__user {
-  position: relative;
-  z-index: 1;
+.mine-page__content {
   display: grid;
-  grid-template-columns: 94rpx minmax(0, 1fr) var(--tms-control-height);
-  align-items: center;
-  gap: 22rpx;
+  min-width: 0;
+  gap: 16px;
 }
 
-.mine-page__avatar {
-  position: relative;
-  width: 94rpx;
-  height: 94rpx;
-  border: 4rpx solid rgba(255, 255, 255, 0.24);
-  border-radius: 50%;
-  background: #fff;
-}
-
-.mine-page__avatar--text {
-  color: var(--tms-primary);
+.mine-identity {
   display: flex;
   align-items: center;
-  justify-content: center;
-  font-size: max(28rpx, 12px);
+  gap: 12px;
+}
+
+.mine-identity__avatar {
+  position: relative;
+  display: grid;
+  width: 52px;
+  height: 52px;
+  flex: 0 0 52px;
+  overflow: hidden;
+  place-items: center;
+  border-radius: 18px;
+  color: var(--mobile-workspace-accent);
+  background: var(--tms-primary-soft);
+  font-size: 22px;
   font-weight: 700;
 }
 
-.mine-page__avatar-image {
+.mine-identity__photo {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  border-radius: 50%;
   opacity: 0;
 }
 
-.mine-page__avatar-image--ready {
+.mine-identity__photo--ready {
   opacity: 1;
 }
 
-.mine-page__profile {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8rpx;
-}
-
-.mine-page__name {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 34rpx;
+.mine-identity__name {
+  color: var(--mobile-workspace-ink);
+  font-size: clamp(18px, 4.6vw, 22px);
   font-weight: 700;
-  line-height: 1.2;
-}
-
-.mine-page__company {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  font-size: max(22rpx, 12px);
-  font-weight: 600;
-  opacity: 0.72;
-}
-
-.mine-page__verified {
-  color: #8ff4dc;
-  display: flex;
-  align-items: center;
-  gap: 6rpx;
-  font-size: max(20rpx, 12px);
-  font-weight: 700;
-}
-
-.mine-page__content {
-  position: relative;
-  z-index: 2;
-  margin-top: -54rpx;
-  padding: 0 28rpx 32rpx;
-  display: flex;
-  flex-direction: column;
-  gap: 22rpx;
-}
-
-.mine-card {
-  padding: 30rpx;
-  border-radius: 24rpx;
-}
-
-.mine-card:first-child {
-  box-shadow: var(--tms-shadow-md);
-}
-
-.mine-card__metrics {
-  margin-top: 26rpx;
-}
-
-.section-title {
-  display: block;
-  margin-top: 7rpx;
-  color: var(--tms-text-strong);
-  font-size: 31rpx;
-  font-weight: 700;
-}
-
-.section-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 20rpx;
-}
-
-.section-head__hint {
-  color: var(--tms-text-secondary);
-  font-size: max(21rpx, 12px);
-}
-
-.account-list {
-  margin-top: 24rpx;
-}
-
-.account-list__row {
-  min-height: 80rpx;
-  border-bottom: 1rpx solid var(--tms-line-subtle);
-  color: var(--tms-text-strong);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 28rpx;
-  font-size: max(26rpx, 12px);
-}
-
-.account-list__row:last-child {
-  border-bottom: 0;
-}
-
-.account-list__row text:first-child {
-  flex: 0 0 160rpx;
-}
-
-.account-list__row text:last-child {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.mine-settings-link {
-  margin-top: 24rpx;
-  width: 100%;
-  min-height: var(--tms-control-height);
-  padding: 18rpx 20rpx;
-  border: 1rpx solid var(--tms-line);
-  border-radius: var(--tms-control-radius);
-  color: var(--tms-text);
-  background: var(--tms-panel);
-  display: flex;
-  align-items: center;
-  gap: 18rpx;
-  text-align: left;
-}
-
-.mine-settings-link::after {
-  border: 0;
-}
-
-.mine-settings-link:active {
-  border-color: var(--tms-primary);
-}
-
-.mine-settings-link:focus-visible {
-  outline: 4rpx solid rgba(var(--tms-primary-rgb), 0.35);
-  outline-offset: 3rpx;
-}
-
-.mine-settings-link__icon {
-  flex: none;
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: 18rpx;
-  color: var(--tms-primary);
-  background: var(--tms-primary-soft);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.mine-settings-link__copy {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4rpx;
-}
-
-.mine-settings-link__title {
-  font-size: max(26rpx, 12px);
-  font-weight: 700;
-}
-
-.mine-settings-link__description {
-  color: var(--tms-muted);
-  font-size: max(22rpx, 12px);
-}
-
-.mine-settings-link__chevron {
-  color: var(--tms-muted);
-}
-
-.feature-grid {
-  margin-top: 28rpx;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14rpx;
-}
-
-.feature-grid__item {
-  width: 100%;
-  height: auto;
-  min-height: 132rpx;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  min-width: 0;
-  color: var(--tms-text-secondary);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14rpx;
-  font-size: max(22rpx, 12px);
-  font-weight: 600;
-  touch-action: manipulation;
-  transition: transform var(--tms-apple-duration-fast) var(--tms-apple-ease);
-}
-
-.feature-grid :deep(.feature-grid__item .wd-button__content),
-.feature-grid :deep(.feature-grid__item .wd-button__text) {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 14rpx;
   line-height: 1.3;
-  white-space: normal;
 }
 
-.feature-grid__item--pressed,
-.feature-grid__item:active {
-  transform: translateY(2rpx) scale(0.97);
+.mine-icon-button.mobile-action {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--mobile-workspace-accent);
 }
 
-.feature-grid__icon {
-  width: 86rpx;
-  height: 86rpx;
-  border-radius: 24rpx;
-  color: var(--tms-primary);
-  background: var(--tms-surface-muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.feature-grid__item:nth-child(2) .feature-grid__icon {
-  color: var(--tms-green-strong);
-  background: var(--tms-green-soft);
-}
-
-.feature-grid__item:nth-child(3) .feature-grid__icon {
-  color: var(--tms-orange-strong);
-  background: var(--tms-orange-soft);
-}
-
-.feature-grid__item:nth-child(4) .feature-grid__icon {
-  color: var(--tms-primary-bright);
+.mine-icon-button.mobile-action:active {
   background: var(--tms-primary-soft);
 }
 
-.mine-page__logout {
-  width: 100%;
-  height: var(--tms-control-height);
-  margin-top: 6rpx;
-  padding: 0;
-  border: 1rpx solid rgba(239, 68, 68, 0.2);
-  border-radius: var(--tms-control-radius);
+.mine-page__logout .mobile-row__label {
   color: var(--tms-red-strong);
-  background: var(--tms-red-soft);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--tms-control-font-size);
-  font-weight: 700;
-}
-
-.mine-page__logout:active {
-  opacity: 0.82;
-}
-
-.mine-help {
-  width: 100%;
 }
 
 .mine-help__panel {
-  position: relative;
-  width: 100%;
-  padding: 32rpx 32rpx calc(34rpx + env(safe-area-inset-bottom));
-  border-radius: 32rpx 32rpx 0 0;
-  background: var(--tms-material-regular);
-  box-shadow: 0 -20rpx 60rpx rgba(15, 23, 42, 0.14);
-  backdrop-filter: blur(22rpx) saturate(140%);
-  -webkit-backdrop-filter: blur(22rpx) saturate(140%);
-}
-
-.mine-help__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.mine-help__close {
-  width: 72rpx;
-  height: 72rpx;
-  min-width: 44px;
-  min-height: 44px;
-  margin: 0;
-  padding: 0;
-  border-radius: 50%;
-  color: #64748b;
-  background: #f1f5f9;
-  font-size: 42rpx;
-  line-height: 72rpx;
+  max-width: 560px;
+  max-height: 80vh;
+  margin-inline: auto;
+  padding: 16px max(20px, var(--mobile-safe-right)) 20px max(20px, var(--mobile-safe-left));
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .mine-help__steps {
-  display: flex;
-  flex-direction: column;
-  gap: 16rpx;
-  margin: 32rpx 0;
+  display: grid;
+  gap: 12px;
+  margin: 8px 0 20px;
+  color: var(--mobile-workspace-muted);
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .mine-help__steps view {
   display: grid;
-  grid-template-columns: 56rpx minmax(0, 1fr);
-  align-items: start;
-  gap: 18rpx;
-  padding: 18rpx;
-  border-radius: 18rpx;
-  background: var(--tms-surface-muted);
-  color: var(--tms-muted);
-  font-size: max(24rpx, 12px);
-  line-height: 1.5;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 8px;
 }
 
 .mine-help__steps view text:first-child {
-  color: var(--tms-primary);
+  color: var(--mobile-workspace-accent);
   font-weight: 700;
-}
-
-.mine-help__done {
-  width: 100%;
-  height: 88rpx;
-  margin: 0;
-  border-radius: 18rpx;
-  color: #fff;
-  background: var(--tms-hero-gradient);
-  font-size: max(27rpx, 12px);
-  font-weight: 700;
-  line-height: 88rpx;
-}
-
-.mine-dialog {
-  width: min(84vw, 520rpx);
 }
 
 .mine-dialog__body {
-  box-sizing: border-box;
-  width: min(84vw, 600rpx);
-  padding: 40rpx 32rpx 32rpx;
-  display: flex;
-  flex-direction: column;
-  gap: 24rpx;
-  background: var(--tms-surface);
-}
-
-.mine-dialog__title {
-  color: var(--tms-text);
-  font-size: 32rpx;
-  font-weight: 700;
-  line-height: 1.3;
-}
-
-.mine-dialog__message {
-  color: var(--tms-muted);
-  font-size: max(25rpx, 12px);
-  line-height: 1.5;
+  display: grid;
+  width: min(84vw, 360px);
+  padding: 20px;
+  gap: 14px;
+  background: var(--mobile-workspace-surface);
 }
 
 .mine-dialog__actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16rpx;
+  gap: 10px;
 }
 
-.mine-dialog__actions :deep(.wd-button) {
+.mine-modal-action.mobile-action {
+  display: grid;
   width: 100%;
-}
-
-@media (max-width: 360px) {
-  .feature-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    row-gap: 18rpx;
-  }
+  place-items: center;
 }
 </style>
