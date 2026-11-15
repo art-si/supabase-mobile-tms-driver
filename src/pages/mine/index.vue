@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import TmsBottomNav from '@/components/business/TmsBottomNav.vue'
 import TmsIcon from '@/components/business/TmsIcon.vue'
-import TmsMetricGrid from '@/components/business/TmsMetricGrid.vue'
+import MobileMetricGrid from '@mobile-core/components/MobileMetricGrid.vue'
 import TmsPageSkeleton from '@mobile-core/components/TmsPageSkeleton.vue'
 import { getUserFacingErrorMessage } from '@/api/supabase'
 import { useAuthStore } from '@/stores/auth'
@@ -173,7 +173,7 @@ async function confirmLogout() {
           <text class="section-head__hint">累计数据</text>
         </view>
         <view class="mine-card__metrics">
-          <TmsMetricGrid :items="metrics" />
+          <MobileMetricGrid :items="metrics" />
         </view>
       </view>
 

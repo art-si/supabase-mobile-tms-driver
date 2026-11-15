@@ -10,7 +10,7 @@ import type {
 } from "@/api/types";
 import TmsIcon from "@/components/business/TmsIcon.vue";
 import TmsPageSkeleton from "@mobile-core/components/TmsPageSkeleton.vue";
-import TmsTopBar from "@/components/business/TmsTopBar.vue";
+import MobileTopBar from "@mobile-core/components/MobileTopBar.vue";
 import WaybillExpenseSheet from "@/components/business/WaybillExpenseSheet.vue";
 import { usePageTheme } from "@/composables/usePageTheme";
 import { useAuthStore } from "@/stores/auth";
@@ -116,7 +116,7 @@ async function handleSuccess() {
 <template>
 <wd-config-provider :theme="themeName">
   <view class="expense-page page">
-    <TmsTopBar
+    <MobileTopBar
       title="费用上报"
       eyebrow="运输费用"
       :subtitle="context?.waybill.waybillNo || '同步运单费用与审批状态'"

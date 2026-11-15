@@ -8,7 +8,7 @@ import TmsDateTimePicker from '@/components/business/TmsDateTimePicker.vue'
 import TmsIcon from '@/components/business/TmsIcon.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/profile'
-import { chooseImages } from '@/utils/file'
+import { chooseImages } from '@mobile-core/files'
 import { formatDateTime } from '@/utils/format'
 
 const props = defineProps<{

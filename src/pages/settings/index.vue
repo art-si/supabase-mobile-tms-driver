@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import TmsTopBar from '@/components/business/TmsTopBar.vue'
+import MobileTopBar from '@mobile-core/components/MobileTopBar.vue'
 import { usePageTheme } from '@/composables/usePageTheme'
 import { THEME_PRESETS, type ThemePresetId } from '@mobile-core/theme'
 
@@ -15,7 +15,7 @@ function selectTheme(preset: ThemePresetId) {
 <template>
 <wd-config-provider :theme="themeName">
   <view class="settings-page page">
-    <TmsTopBar title="设置" eyebrow="偏好设置" subtitle="调整司机端的显示方式" show-back />
+    <MobileTopBar title="设置" eyebrow="偏好设置" subtitle="调整司机端的显示方式" show-back />
     <scroll-view scroll-y class="settings-page__scroll">
       <view class="settings-page__content">
         <view class="settings-card card">

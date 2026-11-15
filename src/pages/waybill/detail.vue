@@ -15,7 +15,7 @@ import type {
 } from "@/api/types";
 import TmsIcon from "@/components/business/TmsIcon.vue";
 import TmsRouteCard from "@/components/business/TmsRouteCard.vue";
-import TmsTopBar from "@/components/business/TmsTopBar.vue";
+import MobileTopBar from "@mobile-core/components/MobileTopBar.vue";
 import WaybillTrackingTimeline from "@/components/business/WaybillTrackingTimeline.vue";
 import WaybillTrajectoryPanel from "@/components/business/WaybillTrajectoryPanel.vue";
 import WaybillSignatureSheet from "@/components/business/WaybillSignatureSheet.vue";
@@ -392,7 +392,7 @@ function viewReceipt(current?: string) {
     :class="{ 'detail-page--pending': isPending }"
   >
     <view class="detail-page__blue">
-      <TmsTopBar
+      <MobileTopBar
         title="任务详情"
         eyebrow="运单进度"
         subtitle="按当前运输节点完成操作"

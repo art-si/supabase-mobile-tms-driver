@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import TmsBottomNav from '@/components/business/TmsBottomNav.vue'
 import TmsIcon from '@/components/business/TmsIcon.vue'
-import TmsMetricGrid from '@/components/business/TmsMetricGrid.vue'
+import MobileMetricGrid from '@mobile-core/components/MobileMetricGrid.vue'
 import TmsPageSkeleton from '@mobile-core/components/TmsPageSkeleton.vue'
 import TmsRouteCard from '@/components/business/TmsRouteCard.vue'
 import TmsVehicleVisual from '@/components/business/TmsVehicleVisual.vue'
@@ -297,7 +297,7 @@ function handleTaskAction() {
               </text>
             </view>
           </view>
-          <TmsMetricGrid :items="vehicleMetrics" />
+          <MobileMetricGrid :items="vehicleMetrics" />
         </view>
       </view>
     </scroll-view>

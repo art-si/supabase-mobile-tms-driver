@@ -20,7 +20,7 @@ import TmsRecordTimeNotice from "@/components/business/TmsRecordTimeNotice.vue";
 import TmsIcon from '@/components/business/TmsIcon.vue'
 import { useAuthStore } from "@/stores/auth";
 import { useDictionaryStore } from "@/stores/dictionary";
-import { chooseImages } from "@/utils/file";
+import { chooseImages } from "@mobile-core/files";
 import { getCurrentGcj02Location } from "@/utils/location";
 
 interface ExpenseAttachmentDraft {

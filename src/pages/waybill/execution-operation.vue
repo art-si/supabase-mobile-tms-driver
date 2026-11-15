@@ -13,12 +13,12 @@ import TmsIcon from "@/components/business/TmsIcon.vue";
 import TmsPageSkeleton from "@mobile-core/components/TmsPageSkeleton.vue";
 import TmsRecordTimeNotice from "@/components/business/TmsRecordTimeNotice.vue";
 import TmsDateTimePicker from "@/components/business/TmsDateTimePicker.vue";
-import TmsTopBar from "@/components/business/TmsTopBar.vue";
+import MobileTopBar from "@mobile-core/components/MobileTopBar.vue";
 import { usePageTheme } from "@/composables/usePageTheme";
 import { useAuthStore } from "@/stores/auth";
 import { useProfileStore } from "@/stores/profile";
 import { useWaybillStore } from "@/stores/waybill";
-import { chooseImages } from "@/utils/file";
+import { chooseImages } from "@mobile-core/files";
 import { formatDateTime } from "@/utils/format";
 
 const { themeName } = usePageTheme();
@@ -234,7 +234,7 @@ function showError(error: unknown, fallback: string) {
 <wd-config-provider :theme="themeName">
   <view class="execution-page page">
     <view class="execution-page__hero">
-      <TmsTopBar :title="title" show-back />
+      <MobileTopBar :title="title" show-back />
       <view class="execution-page__hero-main">
         <view class="execution-page__icon"
           ><TmsIcon :name="isDeparture ? 'vehicle' : 'check'" size="46rpx"

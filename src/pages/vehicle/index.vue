@@ -3,9 +3,9 @@ import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import TmsBottomNav from '@/components/business/TmsBottomNav.vue'
 import TmsIcon from '@/components/business/TmsIcon.vue'
-import TmsMetricGrid from '@/components/business/TmsMetricGrid.vue'
+import MobileMetricGrid from '@mobile-core/components/MobileMetricGrid.vue'
 import TmsPageSkeleton from '@mobile-core/components/TmsPageSkeleton.vue'
-import TmsTopBar from '@/components/business/TmsTopBar.vue'
+import MobileTopBar from '@mobile-core/components/MobileTopBar.vue'
 import TmsVehicleVisual from '@/components/business/TmsVehicleVisual.vue'
 import { getUserFacingErrorMessage } from '@/api/supabase'
 import { useDictionaryStore } from '@/stores/dictionary'
@@ -82,7 +82,7 @@ function preview(url?: string) {
 <template>
 <wd-config-provider :theme="themeName">
   <view class="vehicle-page page safe-bottom">
-    <TmsTopBar title="车辆中心" eyebrow="车辆档案" subtitle="查看绑定车辆与证件状态" />
+    <MobileTopBar title="车辆中心" eyebrow="车辆档案" subtitle="查看绑定车辆与证件状态" />
 
     <scroll-view scroll-y class="vehicle-page__scroll">
     <TmsPageSkeleton
@@ -116,7 +116,7 @@ function preview(url?: string) {
             </text>
           </view>
         </view>
-        <TmsMetricGrid :items="metrics" />
+        <MobileMetricGrid :items="metrics" />
       </view>
 
       <view class="status-card card">

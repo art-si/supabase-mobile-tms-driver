@@ -1,41 +1,15 @@
 <script setup lang="ts">
-import { onLaunch, onShow } from '@dcloudio/uni-app'
+import { useStartupData } from '@mobile-core/startup'
 import { useAuthStore } from '@/stores/auth'
 import { useDictionaryStore } from '@/stores/dictionary'
 
-let startupPromise: Promise<void> | null = null
-
-function loadStartupData() {
-  if (startupPromise) return startupPromise
-
-  startupPromise = (async () => {
-    const auth = useAuthStore()
-    const isValid = await auth.ensureValidSession()
-    if (isValid) await useDictionaryStore().load(auth.token)
-  })()
-    .catch((error) => {
-      console.warn('startup data loading failed', error)
-    })
-    .finally(() => {
-      startupPromise = null
-    })
-
-  return startupPromise
-}
-
-onLaunch(() => {
-  void loadStartupData()
-})
-
-onShow(() => {
-  void loadStartupData()
-})
+useStartupData(useAuthStore, useDictionaryStore)
 </script>
 
 <style lang="scss">
 @use '@mobile-core/styles/global.scss' as mobile;
 
-@include mobile.apply('tms', 'TMS Icons', '~@/static/icons/tms-icons.ttf');
+@include mobile.apply('tms');
 
 page {
   min-height: 100%;
