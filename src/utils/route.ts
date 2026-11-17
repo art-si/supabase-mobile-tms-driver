@@ -22,8 +22,11 @@ export interface ValidRoutePoint {
 
 function toValidPoint(point?: RoutePoint) {
   if (!point) return null
-  const longitude = Number(point.longitude ?? point.lng)
-  const latitude = Number(point.latitude ?? point.lat)
+  const rawLongitude = point.longitude ?? point.lng
+  const rawLatitude = point.latitude ?? point.lat
+  if (rawLongitude == null || rawLatitude == null || String(rawLongitude).trim() === '' || String(rawLatitude).trim() === '') return null
+  const longitude = Number(rawLongitude)
+  const latitude = Number(rawLatitude)
   if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) return null
   if (longitude < -180 || longitude > 180 || latitude < -90 || latitude > 90) return null
   return {
@@ -92,6 +95,19 @@ export function getWaybillRoutePoints(waybill?: Waybill | null) {
     address: waybill.receiverAddress
   })
   return [start, end].filter(Boolean) as ValidRoutePoint[]
+}
+
+export function findWaybillEndpoint(waybill: Waybill, station: 'shipper' | 'receiver') {
+  const points = waybill.routePoints || []
+  const pickup = station === 'shipper'
+  const endpointType = pickup ? 'start' : 'end'
+  const marked = points.find((point) => point.type === station || point.type === endpointType)
+  const stationCoordinates = pickup
+    ? { longitude: waybill.shipperLongitude, latitude: waybill.shipperLatitude }
+    : { longitude: waybill.receiverLongitude, latitude: waybill.receiverLatitude }
+  const orderedEndpoint = points.length >= 2 ? points[pickup ? 0 : points.length - 1] : undefined
+  return toValidPoint(marked) || toValidPoint(stationCoordinates) ||
+    (orderedEndpoint && !orderedEndpoint.type ? toValidPoint(orderedEndpoint) : null)
 }
 
 export function getEstimatedDurationMin(waybill?: Waybill | null) {

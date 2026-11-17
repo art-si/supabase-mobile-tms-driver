@@ -5,7 +5,7 @@ import type { Waybill } from '@/api/types'
 import { calculateDistanceMeters } from '@/utils/location'
 import { getWaybillRoutePoints } from '@/utils/route'
 import { useThemeStore } from '@/stores/theme'
-import TmsIcon from './TmsIcon.vue'
+import MobileIcon from '@mobile-core/components/MobileIcon.vue'
 
 defineOptions({ options: { styleIsolation: 'shared' } })
 
@@ -729,8 +729,8 @@ onBeforeUnmount(() => {
       'route-map--embedded': embedded
     }"
   >
-    <MobileAction v-if="!embedded" class="route-map__back" aria-label="返回" @click="back">
-      <TmsIcon name="back" size="38rpx" />
+    <MobileAction v-if="!embedded" class="route-map__back" variant="icon" aria-label="返回" @click="back">
+      <MobileIcon name="back" size="38rpx" />
     </MobileAction>
 
     <!-- #ifdef H5 -->
@@ -756,8 +756,8 @@ onBeforeUnmount(() => {
       show-location
     />
     <view v-else-if="points.length >= 2" class="route-map__empty" role="status">
-      <view class="route-map__empty-icon">
-        <TmsIcon name="location" size="34rpx" />
+      <view class="route-map__empty-icon mobile-icon-box">
+        <MobileIcon name="location" size="34rpx" />
       </view>
       <text class="route-map__empty-title">路线地图暂不可用</text>
       <text class="route-map__empty-hint">地图服务尚未配置，可在下方查看业务定位节点</text>
@@ -777,8 +777,8 @@ onBeforeUnmount(() => {
     </view>
 
     <view v-if="points.length < 2" class="route-map__empty">
-      <view class="route-map__empty-icon">
-        <TmsIcon name="location" size="34rpx" />
+      <view class="route-map__empty-icon mobile-icon-box">
+        <MobileIcon name="location" size="34rpx" />
       </view>
       <text class="route-map__empty-title">路线待补充</text>
       <text class="route-map__empty-hint">暂无可用经纬度，可继续查看站点地址</text>
@@ -927,20 +927,14 @@ onBeforeUnmount(() => {
   background: var(--tms-primary);
 }
 
-.route-map__back {
+.route-map__back.mobile-action {
   position: absolute;
   left: 28rpx;
   top: max(calc(34rpx + var(--mobile-safe-top, 0px)), var(--mobile-capsule-top, 0px));
   z-index: 3;
-  width: max(44px, 88rpx);
-  height: max(44px, 88rpx);
-  padding: 0;
   border-radius: 50%;
   color: #344054;
   background: rgba(255, 255, 255, 0.92);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   box-shadow: 0 8rpx 24rpx rgba(31, 41, 55, 0.12);
 }
 
@@ -967,9 +961,6 @@ onBeforeUnmount(() => {
   border-radius: 22rpx;
   color: var(--tms-primary);
   background: rgba(255, 255, 255, 0.82);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   box-shadow: 0 10rpx 26rpx rgba(var(--tms-primary-rgb), 0.1);
 }
 

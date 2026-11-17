@@ -25,6 +25,10 @@ This uni-app application gives drivers a focused mobile workflow for receiving a
 - Departure and return times, odometer readings, and vehicle-condition photos.
 - Signatures, proof of delivery, execution timeline, and final completion.
 - Expense reports with receipt upload, OCR draft, approval status, and synchronization with the web application.
+- Pickup and delivery appointment requests, exception reports, weighbridge records, transit expenses, and read-only certification status from the Mine page.
+- The business AI assistant uses the signed-in Supabase session and the existing `ai-assistant` endpoint. The app sends the conversation without attaching waybill or profile details.
+
+See the [driver RPC review notes](supabase/review/README.md) for the database changes required for appointments, exception reports, and certification status.
 
 ## Local Development
 
@@ -45,7 +49,9 @@ pnpm build:h5
 pnpm build:mp-weixin
 ```
 
-The H5 build is written to `docs/`. A WeChat deployment also requires the correct AppID, allowed domains, location/media permissions, and phone authorization.
+`pnpm build:h5` writes the static site to `docs/`. After committing the build, follow the [GitHub Pages branch publishing guide](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site#publishing-from-a-branch) in the driver repository: go to **Settings → Pages → Deploy from a branch**, then select the branch containing the build and `/docs`. The build includes `.nojekyll`, relative asset URLs, and hash routing for repository subpaths. Builds written to `docs/` exclude AMap security and web service keys. Use only a Supabase publishable or anon key for public builds.
+
+A WeChat deployment also requires the correct AppID, allowed domains, location/media permissions, and phone authorization.
 
 ## Security
 

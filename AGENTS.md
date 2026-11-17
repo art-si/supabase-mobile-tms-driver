@@ -3,6 +3,7 @@
 - Make shared theme, font, button, and form style changes in the main repository under `supabase-mobile-pro/packages/mobile-core/src`. Use this app’s existing stylesheet and component directories for business-specific styles.
 - Before creating, modifying, refactoring, or reviewing source code, first read and apply the local `project-code-quality` skill.
 - Before creating, modifying, refactoring, reviewing, or visually auditing any user-facing page or component, first read and apply both the local `professional-ui-quality` and `web-design-guidelines` skills. Treat responsive layout, touch targets, complete UI states, overflow checks, accessibility, and real-browser visual verification as part of completion.
+- Review UI against the local `apple-design` skill. For motion and gestures, also read `.agents/references/apple-fluid-interactions.md` in the matching `supabase-mobile-pro` checkout.
 - Before any Supabase, database, schema, RLS, Storage, Auth, or API-provider task, first read the local `supabase` skill and verify that the Supabase MCP server is available for this project.
 - This repository is scoped to Supabase project `ckbftoopuyophiebamwy` through `.mcp.json`.
 - Expected MCP URL: `https://mcp.supabase.com/mcp?project_ref=ckbftoopuyophiebamwy&features=database,debugging,development,docs`.

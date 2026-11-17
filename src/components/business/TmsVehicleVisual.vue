@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import TmsIcon from './TmsIcon.vue'
+import MobileIcon from '@mobile-core/components/MobileIcon.vue'
+
+defineOptions({ options: { styleIsolation: 'apply-shared' } })
 
 const props = defineProps<{ photoUrl?: string | null; height?: string }>()
 const failedUrl = ref('')
@@ -20,8 +22,8 @@ function handlePhotoLoad() {
 </script>
 
 <template>
-  <view class="vehicle-visual" :style="{ height: props.height || '94rpx' }">
-    <TmsIcon v-if="!photoReady" name="vehicle" size="52rpx" />
+  <view class="vehicle-visual mobile-icon-box" :style="{ height: props.height || '94rpx' }">
+    <MobileIcon v-if="!photoReady" name="vehicle" size="52rpx" />
     <image
       v-if="photoSrc"
       class="vehicle-visual__photo"
@@ -39,13 +41,9 @@ function handlePhotoLoad() {
 .vehicle-visual {
   position: relative;
   width: 100%;
-  flex: 0 0 auto;
   overflow: hidden;
   color: var(--tms-primary);
   background: linear-gradient(145deg, #fff, var(--tms-primary-soft));
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .vehicle-visual__photo {

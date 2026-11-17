@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import TmsIcon from './TmsIcon.vue'
+import MobileIcon from '@mobile-core/components/MobileIcon.vue'
 withDefaults(
   defineProps<{
     subject?: string;
@@ -11,9 +11,9 @@ withDefaults(
 </script>
 
 <template>
-  <view class="record-time-notice">
-    <TmsIcon name="info" size="30rpx" />
-    <text>
+  <view class="record-time-notice mobile-inline-pair mobile-inline-pair--start">
+    <view class="mobile-inline-pair__icon" aria-hidden="true"><MobileIcon name="info" size="16px" /></view>
+    <text class="record-time-notice__copy">
       支持实时填报与事后补录，{{ subject }}不受当前时间或前后节点限制；系统仅提示，请按实际发生时间填写。
     </text>
   </view>
@@ -28,15 +28,13 @@ withDefaults(
   border-radius: 16rpx;
   color: var(--tms-info);
   background: var(--tms-info-soft);
-  display: flex;
-  align-items: flex-start;
-  gap: 12rpx;
+  --mobile-inline-pair-gap: 6px;
+  --mobile-inline-pair-leading: 1.55;
   font-size: max(23rpx, 12px);
   font-weight: 600;
-  line-height: 1.55;
 }
 
-.record-time-notice text {
+.record-time-notice__copy {
   min-width: 0;
   flex: 1;
 }

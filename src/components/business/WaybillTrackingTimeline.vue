@@ -1,18 +1,22 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import type {
   DriverExpenseRecord,
   Waybill,
   WaybillEvent,
 } from "@/api/types";
 import { formatDateTime, formatMoney } from "@/utils/format";
-import TmsIcon from './TmsIcon.vue'
-import MobileEvidence from '@mobile-core/components/MobileEvidence.vue'
+import { getExpenseAuditStatus } from "@/utils/expense-status";
+import MobileAction from '@mobile-core/components/MobileAction.vue'
+import MobileInlineLabel from '@mobile-core/components/MobileInlineLabel.vue'
+import MobileIcon from '@mobile-core/components/MobileIcon.vue'
+import MobileSegmented from '@mobile-core/components/MobileSegmented.vue'
 
 type TimelineTone = "blue" | "green" | "orange" | "red" | "gray";
 
 interface TimelineItem {
   id: string;
+  category: "transport" | "expense";
   title: string;
   description: string;
   eventTime?: string;
@@ -150,15 +154,14 @@ const eventTypeFallback: Record<string, (typeof actionMeta)[string]> = {
   },
 };
 
-const auditLabel: Record<DriverExpenseRecord["auditStatus"], string> = {
-  draft: "草稿",
-  pending_review: "审批中",
-  approved: "已通过",
-  rejected: "已驳回",
-  voided: "已作废",
-};
-
 const keyActionTotal = 7;
+const filters = [
+  { label: "全部", value: "all" },
+  { label: "运输节点", value: "transport" },
+  { label: "费用记录", value: "expense" },
+] as const;
+const selected = ref<(typeof filters)[number]["value"]>("all");
+const expanded = ref<string>();
 
 function payloadText(payload: Record<string, unknown> | undefined, key: string) {
   const value = payload?.[key];
@@ -228,6 +231,7 @@ function mapEvent(event: WaybillEvent): TimelineItem {
     };
   return {
     id: `event-${event.id}`,
+    category: "transport",
     title: meta.title,
     description: meta.description,
     eventTime: event.eventTime,
@@ -244,24 +248,20 @@ function mapEvent(event: WaybillEvent): TimelineItem {
 }
 
 function mapExpense(record: DriverExpenseRecord): TimelineItem {
-  const status = auditLabel[record.auditStatus];
+  const status = getExpenseAuditStatus(record.auditStatus);
   return {
     id: `expense-${record.id}`,
+    category: "expense",
     title: `费用上报 · ${record.expenseItemName}`,
-    description: `${formatMoney(record.amount)} · ${status}`,
+    description: `${formatMoney(record.amount)} · ${status.label}`,
     eventTime: record.submittedAt || record.createTime,
     recordedAt: record.createTime,
     source: "司机端",
     location: record.expenseLocation || undefined,
     remark: record.remark || record.reviewRemark || undefined,
-    metrics: [`发生日期 ${record.occurredOn}`, `${record.attachments.length} 张凭证`],
+    metrics: record.occurredOn ? [`发生日期 ${record.occurredOn}`] : [],
     attachments: record.attachments,
-    tone:
-      record.auditStatus === "approved"
-        ? "green"
-        : record.auditStatus === "rejected" || record.auditStatus === "voided"
-          ? "red"
-          : "blue",
+    tone: status.tone,
   };
 }
 
@@ -274,6 +274,7 @@ const timeline = computed(() => {
     const assignedMeta = actionMeta.assigned!;
     items.push({
       id: `assigned-${props.waybill.id}`,
+      category: "transport",
       title: assignedMeta.title,
       description: assignedMeta.description,
       eventTime: props.waybill.createTime,
@@ -284,17 +285,26 @@ const timeline = computed(() => {
       tone: assignedMeta.tone,
     });
   }
-  return items.sort((left, right) => {
-    const leftTime = left.eventTime ? new Date(left.eventTime).getTime() : 0;
-    const rightTime = right.eventTime ? new Date(right.eventTime).getTime() : 0;
-    return rightTime - leftTime;
-  });
+  return items.sort((left, right) => eventTimestamp(right) - eventTimestamp(left));
 });
+
+const hasBothTypes = computed(() => timeline.value.some(item => item.category === "transport") && timeline.value.some(item => item.category === "expense"));
+const visibleItems = computed(() => !hasBothTypes.value || selected.value === "all" ? timeline.value : timeline.value.filter(item => item.category === selected.value));
 
 const completedKeyActionCount = computed(
   () =>
     new Set(timeline.value.map((item) => item.keyAction).filter(Boolean)).size,
 );
+
+function eventTimestamp(item: TimelineItem) {
+  return Date.parse(item.eventTime || "") || Date.parse(item.recordedAt || "") || 0;
+}
+
+function timeLabel(item: TimelineItem) {
+  if (item.eventTime && Number.isFinite(Date.parse(item.eventTime))) return formatDateTime(item.eventTime);
+  if (item.recordedAt && Number.isFinite(Date.parse(item.recordedAt))) return `记录于 ${formatDateTime(item.recordedAt)}`;
+  return "时间未记录";
+}
 
 function shouldShowRecordedAt(item: TimelineItem) {
   if (!item.recordedAt || !item.eventTime) return false;
@@ -303,10 +313,14 @@ function shouldShowRecordedAt(item: TimelineItem) {
   return Number.isFinite(recorded) && Number.isFinite(occurred) && Math.abs(recorded - occurred) > 60_000;
 }
 
-function preview(item: TimelineItem, index: number) {
+function hasDetails(item: TimelineItem) {
+  return Boolean(item.metrics.length || item.location || item.remark || shouldShowRecordedAt(item));
+}
+
+function preview(item: TimelineItem) {
   if (!item.attachments.length) return;
   uni.previewImage({
-    current: item.attachments[index],
+    current: item.attachments[0],
     urls: item.attachments,
   });
 }
@@ -319,37 +333,42 @@ function preview(item: TimelineItem, index: number) {
       <text class="section-title" role="heading" aria-level="2">运单记录</text>
       <text v-if="timeline.length" class="driver-copy">{{ completedKeyActionCount }}/{{ keyActionTotal }} 个关键节点</text>
     </view>
-    <view v-if="syncWarning" class="tracking-card__warning" role="status">
-      <TmsIcon name="warning" size="26rpx" aria-hidden="true" />
+    <view v-if="syncWarning" class="tracking-card__warning mobile-inline-pair mobile-inline-pair--start" role="status">
+      <view class="mobile-inline-pair__icon" aria-hidden="true"><MobileIcon name="warning" size="14px" /></view>
       <text>{{ syncWarning }}</text>
     </view>
 
-    <view v-if="timeline.length" class="tracking-list">
-      <view v-for="item in timeline" :key="item.id" class="tracking-item" :class="'tracking-item--' + item.tone">
+    <MobileSegmented v-if="hasBothTypes" v-model="selected" :options="filters" label="筛选运单记录" />
+
+    <view v-if="visibleItems.length" class="tracking-list" role="list">
+      <view v-for="item in visibleItems" :key="item.id" class="tracking-item" :class="'tracking-item--' + item.tone" role="listitem">
         <view class="tracking-item__rail" aria-hidden="true"><view class="tracking-item__dot" /></view>
         <view class="tracking-item__content">
-          <text class="tracking-item__title">{{ item.title }}</text>
+          <text class="tracking-item__title" role="heading" aria-level="3">{{ item.title }}</text>
           <view class="tracking-item__meta">
-            <text>{{ formatDateTime(item.eventTime) }}</text>
+            <text>{{ timeLabel(item) }}</text>
             <text>{{ item.source }}</text>
             <text v-if="item.operator">{{ item.operator }}</text>
           </view>
           <text class="driver-copy">{{ item.description }}</text>
 
-          <view v-if="item.metrics.length" class="tracking-item__meta">
-            <text v-for="metric in item.metrics" :key="metric">{{ metric }}</text>
+          <view v-if="hasDetails(item) || item.attachments.length" class="tracking-item__actions">
+            <MobileAction v-if="hasDetails(item)" variant="link" class="tracking-item__action"
+              :aria-label="`${expanded === item.id ? '收起' : '展开'}${item.title}明细`"
+              :aria-expanded="expanded === item.id" @click="expanded = expanded === item.id ? undefined : item.id"
+            >{{ expanded === item.id ? '收起明细' : '展开明细' }}</MobileAction>
+            <MobileAction v-if="item.attachments.length" variant="link" class="tracking-item__action" @click="preview(item)">
+              <MobileInlineLabel icon="document" :label="`查看 ${item.attachments.length} 张凭证`" />
+            </MobileAction>
           </view>
-          <text v-if="item.location" class="driver-copy">{{ item.location }}</text>
-          <text v-if="item.remark" class="driver-copy">备注 · {{ item.remark }}</text>
-
-          <view v-if="item.attachments.length" class="tracking-item__evidence">
-            <MobileEvidence
-              readonly :images="item.attachments.slice(0, 3)" :label="item.title + '凭证'"
-              @preview="preview(item, $event)"
-            />
-            <text v-if="item.attachments.length > 3" class="driver-copy">共 {{ item.attachments.length }} 张凭证</text>
+          <view v-if="expanded === item.id" class="tracking-item__details">
+            <view v-if="item.metrics.length" class="tracking-item__meta">
+              <text v-for="metric in item.metrics" :key="metric">{{ metric }}</text>
+            </view>
+            <text v-if="item.location" class="driver-copy">{{ item.location }}</text>
+            <text v-if="item.remark" class="driver-copy">备注 · {{ item.remark }}</text>
+            <text v-if="shouldShowRecordedAt(item)" class="driver-copy">系统记录于 {{ formatDateTime(item.recordedAt) }}</text>
           </view>
-          <text v-if="shouldShowRecordedAt(item)" class="driver-copy">系统记录于 {{ formatDateTime(item.recordedAt) }}</text>
         </view>
       </view>
     </view>
@@ -361,23 +380,29 @@ function preview(item: TimelineItem, index: number) {
 .tracking-card { display: grid; gap: 12px; }
 .tracking-card__head { flex-wrap: wrap; }
 .tracking-card__warning {
-  display: flex;
-  align-items: flex-start;
-  gap: 7px;
+  --mobile-inline-pair-gap: 7px;
+  --mobile-inline-pair-leading: 1.4;
   padding: 8px 10px;
   border-radius: 10px;
   color: var(--tms-orange-strong);
   background: var(--tms-orange-soft);
   font-size: 13px;
-  line-height: 1.4;
 }
 .tracking-list { display: grid; }
-.tracking-item { display: grid; grid-template-columns: 10px minmax(0, 1fr); gap: 8px; }
+.tracking-item {
+  --tracking-title-size: 15px;
+  --tracking-title-line-height: 1.35;
+  --tracking-dot-size: 8px;
+  --tracking-dot-center: calc(var(--tracking-title-size) * var(--tracking-title-line-height) / 2);
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr);
+  gap: 8px;
+}
 .tracking-item__rail { position: relative; display: flex; justify-content: center; }
 .tracking-item:not(:last-child) .tracking-item__rail::after {
   position: absolute;
   z-index: 0;
-  inset-block: 10px -10px;
+  inset-block: var(--tracking-dot-center) calc(-1 * var(--tracking-dot-center));
   width: 1px;
   background: var(--mobile-workspace-line);
   content: '';
@@ -385,9 +410,9 @@ function preview(item: TimelineItem, index: number) {
 .tracking-item__dot {
   position: relative;
   z-index: 1;
-  width: 8px;
-  height: 8px;
-  margin-top: 5px;
+  width: var(--tracking-dot-size);
+  height: var(--tracking-dot-size);
+  margin-top: calc(var(--tracking-dot-center) - var(--tracking-dot-size) / 2);
   border-radius: 50%;
   background: var(--mobile-workspace-accent);
 }
@@ -397,7 +422,7 @@ function preview(item: TimelineItem, index: number) {
 .tracking-item--gray .tracking-item__dot { background: var(--mobile-workspace-muted); }
 .tracking-item__content { display: grid; min-width: 0; gap: 4px; padding-bottom: 16px; overflow-wrap: anywhere; }
 .tracking-item:last-child .tracking-item__content { padding-bottom: 0; }
-.tracking-item__title { color: var(--mobile-workspace-ink); font-size: 15px; font-weight: 690; line-height: 1.35; }
+.tracking-item__title { color: var(--mobile-workspace-ink); font-size: var(--tracking-title-size); font-weight: 690; line-height: var(--tracking-title-line-height); }
 .tracking-item__meta {
   display: flex;
   flex-wrap: wrap;
@@ -407,5 +432,7 @@ function preview(item: TimelineItem, index: number) {
   line-height: 1.4;
   font-variant-numeric: tabular-nums;
 }
-.tracking-item__evidence { display: grid; gap: 4px; margin-block: 4px; }
+.tracking-item__actions { display: flex; flex-wrap: wrap; column-gap: 12px; }
+.tracking-item__action { --mobile-action-link-padding: 0; }
+.tracking-item__details { display: grid; gap: 6px; padding: 8px 10px; border-radius: 9px; background: var(--tms-surface-soft); }
 </style>

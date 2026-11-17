@@ -5,10 +5,11 @@ import type { Waybill } from '@/api/types'
 import { getUserFacingErrorMessage } from '@/api/supabase'
 import TmsRecordTimeNotice from '@/components/business/TmsRecordTimeNotice.vue'
 import TmsDateTimePicker from '@/components/business/TmsDateTimePicker.vue'
-import TmsIcon from '@/components/business/TmsIcon.vue'
 import MobileAction from '@mobile-core/components/MobileAction.vue'
+import MobileBottomSheet from '@mobile-core/components/MobileBottomSheet.vue'
 import MobileEvidence from '@mobile-core/components/MobileEvidence.vue'
 import MobileField from '@mobile-core/components/MobileField.vue'
+import MobilePickerTrigger from '@mobile-core/components/MobilePickerTrigger.vue'
 import TmsPageSkeleton from '@mobile-core/components/TmsPageSkeleton.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/profile'
@@ -38,6 +39,7 @@ const form = reactive({
   remark: ''
 })
 const datePickerVisible = ref(false)
+const signedAtLabel = computed(() => formatDateTime(new Date(form.signedAt).toISOString()))
 
 const visible = computed({
   get: () => props.modelValue,
@@ -92,12 +94,12 @@ async function load() {
 }
 
 async function upload(kind: 'receipt' | 'signature') {
-  if (!props.waybill || state.uploading) return
+  if (!visible.value || !props.waybill || state.loading || state.uploading || state.submitting) return
+  state.uploading = kind
   try {
     const currentCount = kind === 'receipt' ? form.receiptUrls.length : form.signatureUrls.length
     const paths = await chooseImages((kind === 'receipt' ? 5 : 3) - currentCount)
     if (!paths.length) return
-    state.uploading = kind
     const operator = profile.driver?.driverName || profile.user?.nickName || profile.user?.userName
     const files = await uploadWaybillProofFiles(
       auth.token,
@@ -117,6 +119,7 @@ async function upload(kind: 'receipt' | 'signature') {
 }
 
 function remove(kind: 'receipt' | 'signature', index: number) {
+  if (!visible.value || state.uploading || state.submitting) return
   const target = kind === 'receipt' ? form.receiptUrls : form.signatureUrls
   target.splice(index, 1)
 }
@@ -127,11 +130,7 @@ function preview(kind: 'receipt' | 'signature', index: number) {
 }
 
 async function submit() {
-  if (!props.waybill || state.submitting) return
-  if (!form.signerName.trim()) return void uni.showToast({ title: '请输入签收人', icon: 'none' })
-  if (!form.receiptUrls.length) return void uni.showToast({ title: '请上传签收回单', icon: 'none' })
-  if (!form.signatureUrls.length)
-    return void uni.showToast({ title: '请上传签字确认照片', icon: 'none' })
+  if (!visible.value || !props.waybill || !canSubmit.value) return
 
   state.submitting = true
   try {
@@ -144,7 +143,6 @@ async function submit() {
       [...form.signatureUrls],
       form.remark.trim() || null
     )
-    uni.showToast({ title: '签收成功', icon: 'success' })
     emit('success')
     visible.value = false
   } catch (error) {
@@ -165,78 +163,68 @@ function showError(error: unknown, fallback: string) {
 
 
 <template>
-  <wd-popup
+  <MobileBottomSheet
     v-model="visible"
-    position="bottom"
-    :close-on-click-modal="!state.submitting"
-    custom-style="border-radius: 24px 24px 0 0; overflow: hidden; padding-bottom: var(--mobile-safe-bottom, 0px);"
+    title="签收确认"
+    close-label="关闭签收确认"
+    :busy="state.submitting"
+    tall
   >
-    <view class="signature-sheet">
-      <view class="signature-sheet__header">
-        <text class="signature-sheet__title" role="heading" aria-level="2">签收确认</text>
-        <MobileAction class="signature-sheet__close" aria-label="关闭签收确认" :disabled="state.submitting" @click="visible = false">
-          <TmsIcon name="close" size="31rpx" aria-hidden="true" />
-        </MobileAction>
-      </view>
-
-      <scroll-view scroll-y class="signature-sheet__body">
-        <view class="signature-sheet__content">
-          <TmsPageSkeleton
-            v-if="state.loading || state.error" compact label="正在同步签收信息…"
-            :error="state.error" @retry="load"
+    <view class="signature-sheet__content">
+      <TmsPageSkeleton
+        v-if="state.loading || state.error" compact label="正在同步签收信息…"
+        :error="state.error" @retry="load"
+      />
+      <template v-else>
+        <view class="signature-sheet__fields">
+          <MobileField field="signature-time" label="签收时间" required>
+            <MobilePickerTrigger
+              id="signature-time" label="选择签收时间" :value="signedAtLabel"
+              :description="`已选时间：${signedAtLabel}`"
+              :expanded="datePickerVisible" :disabled="state.submitting" @click="datePickerVisible = true"
+            />
+          </MobileField>
+          <TmsRecordTimeNotice subject="签收时间" />
+          <MobileField
+            v-model="form.signerName" field="signature-signer" label="签收人"
+            :maxlength="50" required placeholder="请输入实际签收人"
           />
-          <template v-else>
-            <view class="signature-sheet__fields">
-              <MobileField field="signature-time" label="签收时间" required>
-                <MobileAction id="signature-time" class="signature-sheet__date" aria-label="选择签收时间" @click="datePickerVisible = true">
-                  <text>{{ formatDateTime(new Date(form.signedAt).toISOString()) }}</text>
-                  <TmsIcon name="chevron" size="27rpx" aria-hidden="true" />
-                </MobileAction>
-                <TmsDateTimePicker
-                  v-model="form.signedAt" v-model:visible="datePickerVisible" title="选择签收时间"
-                />
-              </MobileField>
-              <TmsRecordTimeNotice subject="签收时间" />
-              <MobileField
-                v-model="form.signerName" field="signature-signer" label="签收人"
-                :maxlength="50" required placeholder="请输入实际签收人"
-              />
-            </view>
-
-            <view v-for="kind in ['receipt', 'signature'] as const" :key="kind" class="signature-sheet__fields">
-              <view class="signature-sheet__section">
-                <text class="signature-sheet__label" role="heading" aria-level="3">
-                  {{ kind === 'receipt' ? '签收回单' : '签字确认照片' }}
-                  <text class="required-mark" aria-hidden="true">*</text>
-                </text>
-                <text class="signature-sheet__copy">
-                  {{ kind === 'receipt' ? form.receiptUrls.length + '/5' : form.signatureUrls.length + '/3' }} 张
-                </text>
-              </view>
-              <text class="signature-sheet__copy">
-                {{ kind === 'receipt' ? '请拍清单号和签收信息。' : '请拍收货人签字后的确认凭证。' }}
-              </text>
-              <MobileEvidence
-                :images="kind === 'receipt' ? form.receiptUrls : form.signatureUrls"
-                :label="kind === 'receipt' ? '签收回单' : '签字照片'"
-                :upload-label="kind === 'receipt' ? '上传回单' : '上传签字照片'"
-                :limit="kind === 'receipt' ? 5 : 3"
-                :disabled="state.submitting || Boolean(state.uploading)"
-                :uploading="state.uploading === kind"
-                @preview="preview(kind, $event)" @remove="remove(kind, $event)" @upload="upload(kind)"
-              />
-            </view>
-
-            <view class="signature-sheet__fields">
-              <MobileField
-                v-model="form.remark" field="signature-remark" label="备注"
-                multiline :maxlength="300" placeholder="可填写货损、少货或现场说明"
-              />
-            </view>
-          </template>
         </view>
-      </scroll-view>
 
+        <view v-for="kind in ['receipt', 'signature'] as const" :key="kind" class="signature-sheet__fields">
+          <view class="signature-sheet__section">
+            <text class="signature-sheet__label" role="heading" aria-level="3">
+              {{ kind === 'receipt' ? '签收回单' : '签字确认照片' }}
+              <text class="required-mark" aria-hidden="true">*</text>
+            </text>
+            <text class="signature-sheet__copy">
+              {{ kind === 'receipt' ? form.receiptUrls.length + '/5' : form.signatureUrls.length + '/3' }} 张
+            </text>
+          </view>
+          <text class="signature-sheet__copy">
+            {{ kind === 'receipt' ? '请拍清单号和签收信息。' : '请拍收货人签字后的确认凭证。' }}
+          </text>
+          <MobileEvidence
+            :images="kind === 'receipt' ? form.receiptUrls : form.signatureUrls"
+            :label="kind === 'receipt' ? '签收回单' : '签字照片'"
+            :upload-label="kind === 'receipt' ? '上传回单' : '上传签字照片'"
+            :limit="kind === 'receipt' ? 5 : 3"
+            :disabled="state.submitting || Boolean(state.uploading)"
+            :uploading="state.uploading === kind"
+            @preview="preview(kind, $event)" @remove="remove(kind, $event)" @upload="upload(kind)"
+          />
+        </view>
+
+        <view class="signature-sheet__fields">
+          <MobileField
+            v-model="form.remark" field="signature-remark" label="备注"
+            multiline :maxlength="300" placeholder="可填写货损、少货或现场说明"
+          />
+        </view>
+      </template>
+    </view>
+
+    <template #footer>
       <view class="signature-sheet__footer">
         <text v-if="!state.loading && !state.error" class="signature-sheet__copy" role="status">
           {{ submitMissing.length ? '还需 ' + submitMissing.join('、') : '签收后还需录入收车时间和里程。' }}
@@ -247,46 +235,29 @@ function showError(error: unknown, fallback: string) {
             class="signature-sheet__action tms-primary-action" :disabled="!canSubmit" :aria-busy="state.submitting"
             @click="submit"
           >
-            <wd-loading v-if="state.submitting" type="circular" color="#fff" size="28rpx" />
-            {{ state.submitting ? '正在签收…' : '确认签收' }}
+            <view class="mobile-inline-pair">
+              <wd-loading v-if="state.submitting" type="circular" color="#fff" size="28rpx" aria-hidden="true" />
+              <text class="mobile-inline-pair__label">{{ state.submitting ? '正在签收…' : '确认签收' }}</text>
+            </view>
           </MobileAction>
         </view>
       </view>
-    </view>
-  </wd-popup>
+    </template>
+    <template #overlay>
+      <TmsDateTimePicker
+        v-model="form.signedAt" v-model:visible="datePickerVisible" title="选择签收时间"
+      />
+    </template>
+  </MobileBottomSheet>
 </template>
 
 <style scoped lang="scss">
-@use '@mobile-core/styles/workspace';
-
-.signature-sheet {
-  display: flex;
-  flex-direction: column;
-  height: min(90vh, 760px);
-  height: min(90dvh, 760px);
-  @include workspace.limit-bottom-sheet();
-  background: var(--mobile-workspace-canvas, var(--tms-bg));
-}
-.signature-sheet__header,
 .signature-sheet__section { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.signature-sheet__header {
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--tms-line-subtle);
-  background: var(--tms-surface);
-}
-.signature-sheet__title { color: var(--tms-text-strong); font-size: 21px; font-weight: 720; line-height: 1.3; }
-.signature-sheet__close {
+.signature-sheet__content {
   display: grid;
-  width: 44px;
-  height: 44px;
-  flex: none;
-  place-items: center;
-  border-radius: 50%;
-  color: var(--tms-text-secondary);
-  background: var(--tms-surface-muted);
+  gap: 12px;
+  padding: 12px max(16px, var(--mobile-safe-right)) 16px max(16px, var(--mobile-safe-left));
 }
-.signature-sheet__body { min-height: 0; flex: 1; overscroll-behavior: contain; }
-.signature-sheet__content { display: grid; gap: 12px; padding: 12px 16px 16px; }
 .signature-sheet__fields {
   display: grid;
   min-width: 0;
@@ -298,26 +269,7 @@ function showError(error: unknown, fallback: string) {
 }
 .signature-sheet__label { color: var(--tms-text-strong); font-size: 14px; font-weight: 690; }
 .signature-sheet__copy { color: var(--tms-text-secondary); font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
-.signature-sheet__date {
-  display: flex;
-  min-height: 44px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 0 12px;
-  border: 1px solid var(--tms-line);
-  border-radius: 12px;
-  color: var(--tms-text-strong);
-  background: var(--tms-surface-soft);
-  font-size: 15px;
-}
-.signature-sheet__footer {
-  display: grid;
-  gap: 8px;
-  padding: 10px 16px;
-  border-top: 1px solid var(--tms-line-subtle);
-  background: var(--tms-surface);
-}
+.signature-sheet__footer { display: grid; gap: 8px; }
 .signature-sheet__controls { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
 .signature-sheet__action { display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; }
 </style>

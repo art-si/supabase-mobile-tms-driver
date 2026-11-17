@@ -1,0 +1,1 @@
+var e={draft:{label:"草稿",tone:"gray"},pending_review:{label:"审批中",tone:"blue"},approved:{label:"已通过",tone:"green"},rejected:{label:"已驳回",tone:"red"},voided:{label:"已作废",tone:"gray"}};function n(n){return e[n]??{label:"状态待确认",tone:"gray"}}function a(e){return["accepted","loading","transporting","unloading","signed","completed"].includes(e)}export{n,a as t};

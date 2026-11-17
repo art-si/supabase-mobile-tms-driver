@@ -1,0 +1,1 @@
+import{D as t,Ot as o,st as r}from"./index-B6BFOo2w.js";function s(s,n){const e=r();if(!e)return;const i=e.appContext.config.globalProperties;o(()=>{const t=i.$route;return t?.path===s?t.query:void 0},(o,r)=>{if(!o||!r)return;const s=t();Object.is(s[s.length-1],e.proxy)&&n(o)},{flush:"post"})}export{s as t};

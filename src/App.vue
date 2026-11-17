@@ -17,6 +17,7 @@ useStartupData(useAuthStore, useDictionaryStore)
 @use '@mobile-core/styles/global.scss' as mobile;
 @use '@mobile-core/styles/workspace.scss';
 @use '@mobile-core/styles/grouped-list.scss' as grouped-list;
+@use '@mobile-core/styles/control-reset.scss';
 
 @include mobile.apply('tms');
 @include workspace.apply('driver');
@@ -70,53 +71,11 @@ body {
 }
 /* #endif */
 
-view,
-text,
-button,
-input,
-textarea {
-  box-sizing: border-box;
-}
-
-button::after {
-  border: 0;
-}
-
-button,
-[role='button'] {
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-}
-
-button,
-input,
-textarea {
-  font-family: inherit;
-}
-
-button:focus-visible,
-[role='button']:focus-visible {
-  outline: 4rpx solid rgba(var(--tms-primary-rgb), 0.32);
-  outline-offset: 4rpx;
-}
+@include control-reset.apply('tms');
 
 /* #ifdef H5 */
-uni-scroll-view .uni-scroll-view {
-  scrollbar-width: none;
-}
-
-uni-scroll-view .uni-scroll-view::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-}
-
 uni-scroll-view .uni-scroll-view {
   overscroll-behavior: contain;
 }
 /* #endif */
-
-input,
-textarea {
-  caret-color: var(--tms-primary);
-}
 </style>

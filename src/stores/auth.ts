@@ -1,11 +1,10 @@
 import { defineStore } from 'pinia'
+import { redirectToLogin } from '@mobile-core/login-navigation'
 import { ApiRequestError, driverPasswordLogin, driverWechatPhoneLogin, refreshToken, signOut } from '@/api/supabase'
 import type { Session } from '@/api/types'
 import { useDictionaryStore } from './dictionary'
 
 const STORAGE_KEY = 'tms-driver-session'
-const LOGIN_URL = '/pages/login/index'
-const LOGIN_ROUTE = 'pages/login/index'
 
 let sessionRevision = 0
 let pendingRefresh: { revision: number; promise: Promise<void> } | null = null
@@ -21,16 +20,6 @@ function normalizeSession(session: Session | null) {
     session.expires_at = Math.floor(Date.now() / 1000) + session.expires_in
   }
   return session
-}
-
-function isLoginPage() {
-  const pages = getCurrentPages()
-  return pages[pages.length - 1]?.route === LOGIN_ROUTE
-}
-
-function redirectToLogin() {
-  if (isLoginPage()) return
-  uni.reLaunch({ url: LOGIN_URL })
 }
 
 export const useAuthStore = defineStore('auth', {

@@ -4,11 +4,13 @@ import { computed, reactive, ref } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import { getUserFacingErrorMessage } from "@/api/supabase";
 import MobileAction from "@mobile-core/components/MobileAction.vue";
+import MobileInlineLabel from "@mobile-core/components/MobileInlineLabel.vue";
+import MobileLocationFeedback from "@mobile-core/components/MobileLocationFeedback.vue";
 import MobileEvidence from "@mobile-core/components/MobileEvidence.vue";
 import MobileField from "@mobile-core/components/MobileField.vue";
 import MobileStatusTag from "@mobile-core/components/MobileStatusTag.vue";
 import MobileTopBar from "@mobile-core/components/MobileTopBar.vue";
-import TmsIcon from "@/components/business/TmsIcon.vue";
+import MobileIcon from "@mobile-core/components/MobileIcon.vue";
 import TmsPageSkeleton from "@mobile-core/components/TmsPageSkeleton.vue";
 import { usePageTheme } from "@/composables/usePageTheme";
 import {
@@ -29,6 +31,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useProfileStore } from "@/stores/profile";
 import { useWaybillStore } from "@/stores/waybill";
 import { chooseImages } from "@mobile-core/files";
+import { LocationPermissionError } from "@mobile-core/location";
 import { formatDateTime } from "@/utils/format";
 import {
   calculateDistanceMeters,
@@ -62,6 +65,8 @@ const state = reactive({
   analyzing: false,
   uploading: "",
   error: "",
+  checkInError: "",
+  locationPermissionDenied: false,
 });
 const form = reactive<OperationForm>({
   grossWeightTon: "",
@@ -89,42 +94,58 @@ const address = computed(() => {
 const isCompleted = computed(
   () => context.value?.operation?.operationStatus === "completed",
 );
-const submitMissing = computed(() => {
+function parseWeight(value: string) {
+  const weight = Number(value);
+  return Number.isFinite(weight) && weight > 0 ? weight : null;
+}
+
+const formValidation = computed(() => {
+  const weightTon = parseWeight(form.weightTon);
+  const grossWeightTon = parseWeight(form.grossWeightTon);
+  const tareWeightTon = parseWeight(form.tareWeightTon);
+  const pairInvalid = grossWeightTon !== null && tareWeightTon !== null && grossWeightTon < tareWeightTon;
+  const errors = {
+    net: form.weightTon.trim() && weightTon === null ? "请输入大于 0 的净重。" : "",
+    gross: form.grossWeightTon.trim() && grossWeightTon === null ? "请输入大于 0 的毛重。"
+      : pairInvalid ? "毛重不得小于皮重。" : "",
+    tare: form.tareWeightTon.trim() && tareWeightTon === null ? "请输入大于 0 的皮重。" : "",
+  };
   const missing: string[] = [];
-  if (!form.weightTon || Number(form.weightTon) <= 0) missing.push(`${title.value}净重`);
-  if (form.grossWeightTon && Number(form.grossWeightTon) <= 0) missing.push("毛重格式");
-  if (form.tareWeightTon && Number(form.tareWeightTon) <= 0) missing.push("皮重格式");
-  if (
-    Number(form.grossWeightTon) > 0 &&
-    Number(form.tareWeightTon) > 0 &&
-    Number(form.grossWeightTon) < Number(form.tareWeightTon)
-  ) {
-    missing.push("毛重应不小于皮重");
-  }
+  if (!form.weightTon.trim()) missing.push(`${title.value}净重`);
   if (!form.photoUrls.length) missing.push(`${title.value}照片`);
   if (!form.weighbridgeTicketUrls.length) missing.push("磅单");
-  return missing;
+  const invalid = [errors.net && "净重", errors.gross && "毛重", errors.tare && "皮重"].filter(Boolean);
+  return {
+    errors,
+    weightTon,
+    grossWeightTon,
+    tareWeightTon,
+    weights: weightTon !== null && !missing.length && !invalid.length
+      ? { weightTon, grossWeightTon, tareWeightTon }
+      : null,
+    hint: [
+      invalid.length && `请检查：${invalid.join("、")}`,
+      missing.length && `还需补充：${missing.join("、")}`,
+    ].filter(Boolean).join("；"),
+  };
 });
 const canSubmit = computed(
   () =>
     Boolean(context.value?.operation) &&
-    submitMissing.value.length === 0 &&
+    Boolean(formValidation.value.weights) &&
     !state.submitting &&
     !state.analyzing &&
     !state.uploading,
 );
 const calculatedNetWeight = computed(() => {
-  const gross = Number(form.grossWeightTon);
-  const tare = Number(form.tareWeightTon);
-  if (!Number.isFinite(gross) || !Number.isFinite(tare) || gross <= 0 || tare <= 0) {
-    return null;
-  }
-  return Math.max(0, Number((gross - tare).toFixed(3)));
+  const { grossWeightTon: gross, tareWeightTon: tare } = formValidation.value;
+  if (gross === null || tare === null || gross < tare) return null;
+  return Number((gross - tare).toFixed(3));
 });
 const weightDifferenceWarning = computed(() => {
   const calculated = calculatedNetWeight.value;
-  const net = Number(form.weightTon);
-  if (calculated === null || !Number.isFinite(net) || net <= 0) return "";
+  const net = formValidation.value.weightTon;
+  if (calculated === null || net === null) return "";
   const difference = Math.abs(calculated - net);
   return difference > 0.05
     ? `毛重减皮重为 ${calculated} 吨，与填写净重相差 ${difference.toFixed(3)} 吨，请核对扣水、扣杂等业务数据。`
@@ -170,23 +191,25 @@ onLoad((query) => {
 
 async function load() {
   state.error = "";
+  clearCheckInError();
   if (!id.value) {
     state.error = "缺少运单参数，请返回运单详情后重新进入";
     return;
   }
   state.loading = true;
   try {
-    current.value = await waybillStore.loadDetail(id.value);
+    current.value = await waybillStore.loadWaybill(id.value);
+    if (!current.value) throw new Error("找不到此运单，请返回任务列表重新打开");
     context.value = await auth.withFreshAccess((token) =>
       getCargoOperationContext(token, id.value, operationType.value),
     );
     const operation = context.value.operation;
     Object.assign(form, {
-      grossWeightTon: operation?.grossWeightTon ? String(operation.grossWeightTon) : "",
-      tareWeightTon: operation?.tareWeightTon ? String(operation.tareWeightTon) : "",
-      weightTon: operation?.weightTon ? String(operation.weightTon) : "",
-      photoUrls: operation?.photoUrls || [],
-      weighbridgeTicketUrls: operation?.weighbridgeTicketUrls || [],
+      grossWeightTon: String(operation?.grossWeightTon ?? ""),
+      tareWeightTon: String(operation?.tareWeightTon ?? ""),
+      weightTon: String(operation?.weightTon ?? ""),
+      photoUrls: [...(operation?.photoUrls ?? [])],
+      weighbridgeTicketUrls: [...(operation?.weighbridgeTicketUrls ?? [])],
       recognitionInfo: operation?.recognitionInfo || "",
       recognitionPayload: operation?.recognitionPayload || null,
       remark: operation?.remark || "",
@@ -261,14 +284,29 @@ async function tryAutomaticCheckIn() {
       null,
       true,
     );
-    uni.showToast({ title: `已自动${title.value}打卡`, icon: "success" });
-  } catch {
-    // 自动打卡失败不阻断页面，司机仍可查看策略并手动重试。
+    if (checkinOnly.value) {
+      uni.showToast({ title: `已自动${title.value}打卡`, icon: "success" });
+    }
+  } catch (error) {
+    if (error instanceof LocationPermissionError) setCheckInError(error);
   }
+}
+
+function clearCheckInError() {
+  state.checkInError = "";
+  state.locationPermissionDenied = false;
+}
+
+function setCheckInError(error: unknown) {
+  const message = getUserFacingErrorMessage(error, "打卡未完成，请重试。");
+  if (message === "已取消打卡") return;
+  state.checkInError = message;
+  state.locationPermissionDenied = error instanceof LocationPermissionError;
 }
 
 async function handleCheckIn() {
   if (state.locating || context.value?.operation) return;
+  clearCheckInError();
   state.locating = true;
   try {
     const location = await getCurrentGcj02Location(address.value);
@@ -280,10 +318,12 @@ async function handleCheckIn() {
       location,
       outsideReason,
     );
-    uni.showToast({ title: `${title.value}打卡成功`, icon: "success" });
-    if (checkinOnly.value) setTimeout(() => uni.navigateBack(), 450);
+    if (checkinOnly.value) {
+      uni.showToast({ title: `${title.value}打卡成功`, icon: "success" });
+      setTimeout(() => uni.navigateBack(), 450);
+    }
   } catch (error) {
-    showError(error, "打卡失败");
+    setCheckInError(error);
   } finally {
     state.locating = false;
   }
@@ -291,6 +331,7 @@ async function handleCheckIn() {
 
 async function uploadEvidence(kind: "photo" | "ticket") {
   if (!current.value || !context.value?.operation || isCompleted.value || state.uploading || state.submitting || state.analyzing) return;
+  state.uploading = kind;
   try {
     const currentCount =
       kind === "photo"
@@ -298,7 +339,6 @@ async function uploadEvidence(kind: "photo" | "ticket") {
         : form.weighbridgeTicketUrls.length;
     const paths = await chooseImages((kind === "photo" ? 5 : 3) - currentCount);
     if (!paths.length) return;
-    state.uploading = kind;
     const operatorName =
       profile.driver?.driverName ||
       profile.user?.nickName ||
@@ -331,13 +371,13 @@ function preview(url: string | undefined, urls: string[]) {
 }
 
 function removeEvidence(kind: "photo" | "ticket", index: number) {
-  if (isCompleted.value) return;
+  if (isCompleted.value || state.uploading || state.submitting || state.analyzing) return;
   const target = kind === "photo" ? form.photoUrls : form.weighbridgeTicketUrls;
   target.splice(index, 1);
 }
 
 async function analyzeWeighbridgeTicket() {
-  if (state.analyzing || state.uploading || !form.weighbridgeTicketUrls.length) return;
+  if (isCompleted.value || state.analyzing || state.uploading || state.submitting || !form.weighbridgeTicketUrls.length) return;
   state.analyzing = true;
   try {
     const result = await analyzeCargoWeighbridgeTicket(
@@ -370,38 +410,8 @@ async function analyzeWeighbridgeTicket() {
 }
 
 async function submit() {
-  if (state.submitting || state.uploading || state.analyzing || isCompleted.value) return;
-  if (!context.value?.operation) {
-    uni.showToast({ title: `请先完成${title.value}打卡`, icon: "none" });
-    return;
-  }
-  const weightTon = Number(form.weightTon);
-  if (!Number.isFinite(weightTon) || weightTon <= 0) {
-    uni.showToast({ title: `请输入正确的${title.value}重量`, icon: "none" });
-    return;
-  }
-  const grossWeightTon = form.grossWeightTon ? Number(form.grossWeightTon) : null;
-  const tareWeightTon = form.tareWeightTon ? Number(form.tareWeightTon) : null;
-  if (grossWeightTon !== null && (!Number.isFinite(grossWeightTon) || grossWeightTon <= 0)) {
-    uni.showToast({ title: "请输入正确的毛重", icon: "none" });
-    return;
-  }
-  if (tareWeightTon !== null && (!Number.isFinite(tareWeightTon) || tareWeightTon <= 0)) {
-    uni.showToast({ title: "请输入正确的皮重", icon: "none" });
-    return;
-  }
-  if (grossWeightTon !== null && tareWeightTon !== null && grossWeightTon < tareWeightTon) {
-    uni.showToast({ title: "毛重不能小于皮重", icon: "none" });
-    return;
-  }
-  if (!form.photoUrls.length) {
-    uni.showToast({ title: `请上传${title.value}照片`, icon: "none" });
-    return;
-  }
-  if (!form.weighbridgeTicketUrls.length) {
-    uni.showToast({ title: `请上传${title.value}磅单`, icon: "none" });
-    return;
-  }
+  const weights = formValidation.value.weights;
+  if (!canSubmit.value || !weights || isCompleted.value) return;
   state.submitting = true;
   try {
     context.value = await completeCargoOperation(
@@ -409,9 +419,7 @@ async function submit() {
       id.value,
       operationType.value,
       {
-        grossWeightTon,
-        tareWeightTon,
-        weightTon,
+        ...weights,
         photoUrls: [...form.photoUrls],
         weighbridgeTicketUrls: [...form.weighbridgeTicketUrls],
         recognitionInfo: form.recognitionInfo || null,
@@ -419,7 +427,6 @@ async function submit() {
         remark: form.remark.trim() || null,
       },
     );
-    await waybillStore.loadDetail(id.value);
     uni.showToast({ title: `${title.value}信息已提交`, icon: "success" });
     setTimeout(() => uni.navigateBack(), 650);
   } catch (error) {
@@ -430,15 +437,13 @@ async function submit() {
 }
 
 function showError(error: unknown, fallback: string) {
-  const message = getUserFacingErrorMessage(error, fallback);
-  if (message === "已取消打卡") return;
-  uni.showToast({ title: message || fallback, icon: "none", duration: 3000 });
+  uni.showToast({ title: getUserFacingErrorMessage(error, fallback), icon: "none", duration: 3000 });
 }
 </script>
 
 <template>
   <wd-config-provider :theme="themeName">
-    <MobileWorkspace class="page driver-page operation-page" :class="themeName">
+    <MobileWorkspace :container-class="['page driver-page operation-page', themeName]">
       <MobileTopBar :title="pageTitle" capsule="always" show-back />
       <TmsPageSkeleton
         v-if="state.loading || state.error"
@@ -455,8 +460,8 @@ function showError(error: unknown, fallback: string) {
       >
         <view class="driver-card driver-stack" aria-labelledby="cargo-checkin-title">
           <view class="cargo-checkin">
-            <view class="cargo-checkin__icon" :class="{ 'cargo-checkin__icon--done': context.operation }">
-              <TmsIcon :name="context.operation ? 'check' : 'location'" size="21px" />
+            <view class="cargo-checkin__icon mobile-icon-box" :class="{ 'cargo-checkin__icon--done': context.operation }">
+              <MobileIcon :name="context.operation ? 'check' : 'location'" size="21px" />
             </view>
             <view class="cargo-checkin__heading">
               <text id="cargo-checkin-title" class="section-title" role="heading" aria-level="2">
@@ -494,21 +499,28 @@ function showError(error: unknown, fallback: string) {
               </text>
               <text class="driver-copy">{{ policyHint }}</text>
             </view>
+            <MobileLocationFeedback
+              v-if="state.checkInError"
+              id="cargo-checkin-error"
+              :message="state.checkInError"
+              :permission-denied="state.locationPermissionDenied"
+              @permission-granted="handleCheckIn"
+            />
             <MobileAction
               class="mobile-dock__action tms-primary-action"
               :disabled="state.locating"
               :aria-busy="state.locating"
+              :aria-describedby="state.checkInError ? 'cargo-checkin-error' : undefined"
               @click="handleCheckIn"
             >
-              <TmsIcon name="location" size="18px" />
-              <text>{{ state.locating ? "正在获取定位…" : "获取定位并打卡" }}</text>
+              <MobileInlineLabel icon="location" :label="state.locating ? '正在获取定位…' : state.checkInError ? '重新定位并打卡' : '获取定位并打卡'" :icon-size="18" />
             </MobileAction>
           </template>
         </view>
 
-        <view v-if="!checkinOnly && !context.operation" class="driver-card cargo-locked">
-          <TmsIcon name="lock" size="18px" />
-          <text class="driver-copy">完成定位打卡后，填写净重并上传{{ title }}照片和磅单。</text>
+        <view v-if="!checkinOnly && !context.operation" class="driver-card driver-copy cargo-locked mobile-inline-pair mobile-inline-pair--start">
+          <view class="mobile-inline-pair__icon" aria-hidden="true"><MobileIcon name="lock" size="18px" /></view>
+          <text class="mobile-inline-pair__label">完成定位打卡后，填写净重并上传{{ title }}照片和磅单。</text>
         </view>
 
         <template v-if="!checkinOnly && context.operation">
@@ -520,6 +532,7 @@ function showError(error: unknown, fallback: string) {
               :label="title + '净重（吨）'"
               inputmode="decimal"
               placeholder="例如 12.5…"
+              :error="isCompleted ? '' : formValidation.errors.net"
               :readonly="isCompleted"
               :disabled="state.submitting"
               required
@@ -531,6 +544,7 @@ function showError(error: unknown, fallback: string) {
                 label="毛重（吨）"
                 inputmode="decimal"
                 placeholder="选填"
+                :error="isCompleted ? '' : formValidation.errors.gross"
                 :readonly="isCompleted"
                 :disabled="state.submitting"
               />
@@ -540,6 +554,7 @@ function showError(error: unknown, fallback: string) {
                 label="皮重（吨）"
                 inputmode="decimal"
                 placeholder="选填"
+                :error="isCompleted ? '' : formValidation.errors.tare"
                 :readonly="isCompleted"
                 :disabled="state.submitting"
               />
@@ -559,7 +574,7 @@ function showError(error: unknown, fallback: string) {
               :label="title + '照片'"
               upload-label="上传照片"
               :readonly="isCompleted"
-              :disabled="Boolean(state.uploading) || state.submitting"
+              :disabled="Boolean(state.uploading) || state.submitting || state.analyzing"
               :uploading="state.uploading === 'photo'"
               @upload="uploadEvidence('photo')"
               @preview="preview(form.photoUrls[$event], form.photoUrls)"
@@ -628,7 +643,7 @@ function showError(error: unknown, fallback: string) {
         class="mobile-dock operation-footer"
         aria-label="装卸货提交操作"
       >
-        <text v-if="submitMissing.length" class="mobile-dock__note">还需补充：{{ submitMissing.join("、") }}</text>
+        <text v-if="formValidation.hint" class="mobile-dock__note">{{ formValidation.hint }}</text>
         <MobileAction
           class="mobile-dock__action tms-primary-action"
           :disabled="!canSubmit"
@@ -645,9 +660,6 @@ function showError(error: unknown, fallback: string) {
 <style scoped lang="scss">
 .cargo-checkin { display: flex; min-width: 0; align-items: center; gap: 10px; }
 .cargo-checkin__icon {
-  flex: none;
-  display: grid;
-  place-items: center;
   width: 40px;
   height: 40px;
   border-radius: 12px;
@@ -664,8 +676,8 @@ function showError(error: unknown, fallback: string) {
 .cargo-checkin__facts .driver-copy { font-weight: 400; }
 .cargo-policy, .cargo-ocr { padding-top: 10px; border-top: 1px solid var(--mobile-workspace-line); }
 .cargo-policy__title, .cargo-ocr__title { font-size: 14px; font-weight: 700; }
-.cargo-locked { display: flex; align-items: center; gap: 8px; color: var(--mobile-workspace-muted); }
-.cargo-weight-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.cargo-locked { --mobile-inline-pair-gap: 8px; --mobile-inline-pair-leading: 1.55; display: flex; }
+.cargo-weight-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 12px; }
 .cargo-weight-warning { color: var(--tms-orange-strong); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
 .cargo-ocr { display: grid; gap: 8px; }
 .cargo-ocr__raw {

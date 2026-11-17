@@ -2,6 +2,20 @@ import { rpc } from './supabase'
 import { getRoutePointsDistanceKm } from '@/utils/route'
 import type { ProfileSummary, Waybill } from './types'
 
+export interface DriverCertification {
+  required: boolean
+  certified: boolean
+  reason: string | null
+  reviewedAt: string | null
+  identityStatus: string
+  licenseStatus: string
+  qualificationStatus: string
+}
+
+export function getDriverCertification(token: string) {
+  return rpc<DriverCertification>(token, 'tms_get_driver_mobile_certification', {})
+}
+
 export async function getProfileSummary(token: string) {
   const [summary, completedWaybills] = await Promise.all([
     rpc<ProfileSummary>(token, 'tms_get_driver_mobile_profile', {}),

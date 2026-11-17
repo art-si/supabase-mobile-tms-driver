@@ -56,7 +56,44 @@
       }
     },
     {
+      "path": "pages/waybill/weighbridge",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
       "path": "pages/mine/index",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/mine/certification",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/mine/assistant",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/mine/exception",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/appointment/index",
+      "style": {
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/appointment/apply",
       "style": {
         "navigationStyle": "custom"
       }
@@ -72,8 +109,10 @@
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "TMS司机端",
     "navigationBarBackgroundColor": "#ffffff",
-    "backgroundColor": "#f4f6fb",
+    // #ifdef H5
     "rpxCalcMaxDeviceWidth": 430,
-    "rpxCalcBaseDeviceWidth": 375
+    "rpxCalcBaseDeviceWidth": 375,
+    // #endif
+    "backgroundColor": "#f4f6fb"
   }
 }

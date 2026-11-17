@@ -1,26 +1,28 @@
 <script setup lang="ts">
 import MobileWorkspace from '@mobile-core/components/MobileWorkspace.vue'
+import MobileEmptyState from '@mobile-core/components/MobileEmptyState.vue'
 import { computed, ref } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import { getDriverExpenseContext } from "@/api/expense";
 import { getUserFacingErrorMessage } from "@/api/supabase";
 import type {
-  DriverExpenseAuditStatus,
   DriverExpenseContext,
   DriverExpenseRecord,
 } from "@/api/types";
-import TmsIcon from "@/components/business/TmsIcon.vue";
+import MobileIcon from "@mobile-core/components/MobileIcon.vue";
 import TmsPageSkeleton from "@mobile-core/components/TmsPageSkeleton.vue";
+import MobileLoadError from "@mobile-core/components/MobileLoadError.vue";
 import MobileAction from "@mobile-core/components/MobileAction.vue";
+import MobileInlineLabel from "@mobile-core/components/MobileInlineLabel.vue";
 import MobileEvidence from "@mobile-core/components/MobileEvidence.vue";
 import MobileRoute from "@mobile-core/components/MobileRoute.vue";
 import MobileStatusTag from "@mobile-core/components/MobileStatusTag.vue";
-import type { MobileStatusTone } from "@mobile-core/theme";
 import MobileTopBar from "@mobile-core/components/MobileTopBar.vue";
 import WaybillExpenseSheet from "@/components/business/WaybillExpenseSheet.vue";
 import { usePageTheme } from "@/composables/usePageTheme";
 import { useAuthStore } from "@/stores/auth";
 import { formatDateTime, formatMoney } from "@/utils/format";
+import { getExpenseAuditStatus } from "@/utils/expense-status";
 
 const { themeName } = usePageTheme();
 const auth = useAuthStore();
@@ -31,6 +33,7 @@ const error = ref("");
 const sheetVisible = ref(false);
 const editingRecord = ref<DriverExpenseRecord | null>(null);
 const shouldAutoCreate = ref(false);
+const submitted = ref<{ costId: string; previous: DriverExpenseRecord | null }>();
 
 const records = computed(() => context.value?.records || []);
 const stats = computed(
@@ -43,19 +46,6 @@ const stats = computed(
     },
 );
 
-const statusMeta: Record<
-  DriverExpenseAuditStatus,
-  { label: string; tone: MobileStatusTone }
-> = {
-  draft: { label: "草稿", tone: "gray" },
-  pending_review: {
-    label: "审批中",
-    tone: "blue",
-  },
-  approved: { label: "已通过", tone: "green" },
-  rejected: { label: "已驳回", tone: "red" },
-  voided: { label: "已作废", tone: "gray" },
-};
 
 onLoad((query) => {
   id.value = String(query?.id || "");
@@ -76,9 +66,20 @@ async function load() {
   error.value = "";
   try {
     auth.hydrate();
-    context.value = await auth.withFreshAccess((token) =>
+    const result = await auth.withFreshAccess((token) =>
       getDriverExpenseContext(token, id.value),
     );
+    const receipt = submitted.value;
+    if (receipt) {
+      const { costId, previous } = receipt;
+      const record = result.records.find((item) => item.id === costId);
+      if (!record || (previous && record.auditStatus === "rejected" && record.submittedAt === previous.submittedAt)) return;
+      submitted.value = undefined;
+    }
+    context.value = result;
+    if (receipt) {
+      uni.showToast({ title: receipt.previous ? "已重新提交审批" : "费用已提交审批", icon: "success" });
+    }
     if (shouldAutoCreate.value) {
       shouldAutoCreate.value = false;
       openCreate();
@@ -119,19 +120,27 @@ function previewAttachments(record: DriverExpenseRecord, index: number) {
   });
 }
 
-async function handleSuccess() {
-  editingRecord.value = null;
+async function handleSuccess(costId: string) {
+  submitted.value = { costId, previous: editingRecord.value };
   await load();
 }
 </script>
 
 <template>
   <wd-config-provider :theme="themeName">
-    <MobileWorkspace class="page driver-page expense-page" :class="themeName">
+    <MobileWorkspace :container-class="['page driver-page expense-page', themeName]">
       <MobileTopBar title="费用上报" capsule="always" show-back />
+      <view v-if="submitted && !loading" class="driver-content" role="main">
+        <MobileLoadError
+          title="费用已提交审批"
+          message="费用记录正在同步，请重新加载查看审批状态。"
+          retry-text="重新加载"
+          @retry="load"
+        />
+      </view>
       <TmsPageSkeleton
-        v-if="loading || error"
-        label="正在同步费用项目与审批记录…"
+        v-else-if="loading || error"
+        :label="submitted ? '费用已提交审批，正在同步记录…' : '正在同步费用项目与审批记录…'"
         :error="error"
         @retry="load"
       />
@@ -180,17 +189,24 @@ async function handleSuccess() {
                   <text v-if="record.expenseParentName" class="driver-copy">{{ record.expenseParentName }}</text>
                   <text class="section-title" role="heading" aria-level="3">{{ record.expenseItemName }}</text>
                 </view>
-                <MobileStatusTag :label="statusMeta[record.auditStatus].label" :tone="statusMeta[record.auditStatus].tone" hide-dot />
+                <MobileStatusTag :label="getExpenseAuditStatus(record.auditStatus).label" :tone="getExpenseAuditStatus(record.auditStatus).tone" hide-dot />
               </view>
               <view class="driver-heading expense-record__amount-row">
                 <text class="expense-record__amount">{{ formatMoney(record.amount) }}</text>
                 <text class="driver-copy">发生于 {{ record.occurredOn }}</text>
               </view>
-              <text class="driver-copy" translate="no">单号 {{ record.costNo }}</text>
-              <view v-if="record.reviewRemark" class="expense-record__review" :class="{ 'expense-record__review--rejected': record.auditStatus === 'rejected' }">
-                <TmsIcon :name="record.auditStatus === 'rejected' ? 'warning' : 'info'" size="16px" />
+              <text v-if="record.costNo" class="driver-copy expense-record__number" translate="no">单号 {{ record.costNo }}</text>
+              <view v-if="record.reviewRemark" class="expense-record__review mobile-inline-pair mobile-inline-pair--start" :class="{ 'expense-record__review--rejected': record.auditStatus === 'rejected' }">
+                <view class="mobile-inline-pair__icon" aria-hidden="true">
+                  <MobileIcon :name="record.auditStatus === 'rejected' ? 'warning' : 'info'" size="16px" />
+                </view>
                 <text>{{ record.reviewRemark }}</text>
               </view>
+              <MobileAction
+                v-if="record.auditStatus === 'rejected'"
+                class="driver-inline expense-record__retry"
+                @click="openEdit(record)"
+              >修改并重新提交</MobileAction>
               <view v-if="record.attachments.length" class="expense-record__proofs">
                 <MobileEvidence
                   :images="record.attachments"
@@ -199,27 +215,16 @@ async function handleSuccess() {
                   @preview="previewAttachments(record, $event)"
                 />
               </view>
-              <view class="expense-record__footer">
-                <text class="driver-copy">提交于 {{ formatDateTime(record.submittedAt || record.createTime) }}</text>
-                <MobileAction
-                  v-if="record.auditStatus === 'rejected'"
-                  class="driver-inline"
-                  @click="openEdit(record)"
-                >修改并重新提交</MobileAction>
-              </view>
+              <text v-if="record.submittedAt || record.createTime" class="driver-copy">提交于 {{ formatDateTime(record.submittedAt || record.createTime) }}</text>
             </view>
           </view>
-          <view v-else class="driver-card driver-empty">
-            <view class="driver-empty__icon"><TmsIcon name="document" size="24px" /></view>
-            <text class="section-title">暂无费用上报</text>
-            <text class="driver-copy">垫付费用后，可上传票据并提交审批。</text>
-          </view>
+          <MobileEmptyState v-else class="driver-card" icon="document" title="暂无费用上报" description="垫付费用后，可上传票据并提交审批。" />
         </view>
       </view>
 
-      <view v-if="context?.canReport && !loading && !error" class="mobile-dock expense-footer" aria-label="费用上报操作">
+      <view v-if="context?.canReport && !submitted && !loading && !error" class="mobile-dock expense-footer" aria-label="费用上报操作">
         <MobileAction class="mobile-dock__action tms-primary-action" @click="openCreate">
-          <TmsIcon name="add" size="18px" /><text>新增费用</text>
+          <MobileInlineLabel icon="add" label="新增费用" :icon-size="18" />
         </MobileAction>
       </view>
 
@@ -258,19 +263,18 @@ async function handleSuccess() {
 .expense-totals > view, .expense-record__name { min-width: 0; display: grid; gap: 3px; }
 .expense-totals > view > text:last-child { font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .expense-record__amount-row { flex-wrap: wrap; }
-.expense-record__amount { font-size: 20px; font-weight: 750; line-height: 1.15; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.expense-record__amount { min-width: 0; font-size: 20px; font-weight: 750; line-height: 1.15; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.expense-record__number { overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .expense-record__review {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
+  --mobile-inline-pair-gap: 8px;
+  --mobile-inline-pair-leading: 1.45;
   padding: 9px 10px;
   border-radius: 9px;
   color: var(--tms-info);
   background: var(--tms-info-soft);
   font-size: 13px;
-  line-height: 1.45;
   overflow-wrap: anywhere;
 }
 .expense-record__review--rejected { color: var(--tms-red-strong); background: var(--tms-red-soft); }
-.expense-record__footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 3px 10px; }
+.expense-record__retry { justify-self: start; }
 </style>

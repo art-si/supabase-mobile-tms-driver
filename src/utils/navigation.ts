@@ -1,27 +1,32 @@
 import type { Waybill } from '@/api/types'
 import { isAndroidApp } from '@mobile-core/platform'
-import { getWaybillRoutePoints, type ValidRoutePoint } from './route'
+import { findWaybillEndpoint, type ValidRoutePoint } from './route'
 
-export function openWaybillNavigation(waybill?: Waybill | null) {
-  const points = getWaybillRoutePoints(waybill)
-  const destination = points?.[points.length - 1]
-  const address = waybill?.receiverAddress || waybill?.destinationCity || waybill?.toStationName || ''
-  const name = waybill?.destinationCity || waybill?.toStationName || '目的地'
+export function getWaybillNavigationTarget(waybill: Waybill) {
+  const pickup = waybill.status === 'pending' || waybill.status === 'accepted'
+  const point = findWaybillEndpoint(waybill, pickup ? 'shipper' : 'receiver')
+  const stop = pickup ? '装货地' : '卸货地'
+  const station = pickup ? waybill.fromStationName : waybill.toStationName
+  const city = pickup ? waybill.originCity : waybill.destinationCity
+  const street = pickup ? waybill.senderAddress || waybill.shipperAddress : waybill.receiverAddress
+  const address = street || point?.address || station || city || ''
+  return { point, address, stop, name: station || point?.name || city || stop }
+}
 
-  if (!destination) {
+export function openWaybillNavigation({ point, address, name }: ReturnType<typeof getWaybillNavigationTarget>) {
+
+  if (!point) {
     openAddressFallback(name, address)
     return
   }
-  const target = destination as ValidRoutePoint
-
   // #ifdef H5
-  openWebMapLocation(name, address, target)
-  return
+  openWebMapLocation(name, address, point)
   // #endif
 
+  // #ifndef H5
   uni.openLocation({
-    latitude: target.latitude,
-    longitude: target.longitude,
+    latitude: point.latitude,
+    longitude: point.longitude,
     name,
     address,
     scale: 15,
@@ -29,6 +34,7 @@ export function openWaybillNavigation(waybill?: Waybill | null) {
       uni.showToast({ title: '打开导航失败', icon: 'none' })
     }
   })
+  // #endif
 }
 
 // #ifdef H5

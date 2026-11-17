@@ -6,7 +6,7 @@
   "versionCode": "100",
   "transformPx": false,
   "h5": {
-    "title": "TMS司机端",
+    "title": "TMS 司机端",
     "router": {
       "mode": "hash"
     }

@@ -1,0 +1,1 @@
+function t(){let t=0;function n(){const n=t;return()=>n===t}function o(){t+=1}return{start:()=>(o(),n()),snapshot:n,invalidate:o}}export{t};

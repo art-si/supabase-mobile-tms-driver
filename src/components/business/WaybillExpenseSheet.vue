@@ -17,10 +17,14 @@ import type {
   DriverExpenseWaybill,
 } from "@/api/types";
 import MobileAction from "@mobile-core/components/MobileAction.vue";
+import MobileBottomSheet from "@mobile-core/components/MobileBottomSheet.vue";
+import MobileInlineLabel from "@mobile-core/components/MobileInlineLabel.vue";
+import MobileCalendarDate from "@mobile-core/components/MobileCalendarDate.vue";
 import MobileEvidence from "@mobile-core/components/MobileEvidence.vue";
 import MobileField from "@mobile-core/components/MobileField.vue";
+import MobilePickerTrigger from "@mobile-core/components/MobilePickerTrigger.vue";
 import MobileSelect from "@mobile-core/components/MobileSelect.vue";
-import TmsIcon from '@/components/business/TmsIcon.vue'
+import MobileIcon from '@mobile-core/components/MobileIcon.vue'
 import { useAuthStore } from "@/stores/auth";
 import { useDictionaryStore } from "@/stores/dictionary";
 import { chooseImages } from "@mobile-core/files";
@@ -74,10 +78,9 @@ const form = reactive({
 const attachments = ref<ExpenseAttachmentDraft[]>([]);
 const attachmentImages = computed(() => attachments.value.map((item) => item.src));
 const datePickerVisible = ref(false);
-const expenseDateMin = new Date(new Date().getFullYear() - 5, 0, 1).getTime();
-const expenseDateMax = new Date(new Date().getFullYear() + 1, 11, 31, 23, 59, 59).getTime();
 const initialRemoteUrls = ref<string[]>([]);
 const idempotencyKey = ref("");
+const submitError = ref("");
 const ocrEnabled = ref(true);
 const ocrResult = ref<DriverExpenseOcrAnalyzeResponse>();
 const appliedOcrResult = ref<DriverExpenseOcrAnalyzeResponse>();
@@ -139,6 +142,7 @@ watch(
       resetForm();
       void prepareSheet();
     } else if (previous) {
+      datePickerVisible.value = false;
       void cleanupDraftUploads();
     }
   },
@@ -169,6 +173,7 @@ function resetForm() {
     remoteUrl: url,
   }));
   idempotencyKey.value = createIdempotencyKey();
+  submitError.value = "";
   ocrResult.value = undefined;
   appliedOcrResult.value = undefined;
 }
@@ -185,17 +190,6 @@ async function prepareSheet() {
   } finally {
     state.loadingAiConfig = false;
   }
-}
-
-function openDatePicker() {
-  if (!busy.value) datePickerVisible.value = true;
-}
-
-function handleDateKey(event: KeyboardEvent) {
-  if ((event.key !== "Enter" && event.key !== " ") || event.repeat) return;
-  event.preventDefault();
-  event.stopPropagation();
-  openDatePicker();
 }
 
 function normalizePaymentMethod(value?: string | null) {
@@ -414,6 +408,7 @@ async function submit() {
     .map((item) => item.localPath)
     .filter((path): path is string => Boolean(path));
   let uploaded: Awaited<ReturnType<typeof uploadDriverExpenseFiles>> = [];
+  submitError.value = "";
   state.submitting = true;
   try {
     if (localPaths.length) {
@@ -495,12 +490,8 @@ async function submit() {
       }
     }
 
-    uni.showToast({
-      title: isEditing.value ? "已重新提交审批" : "费用已提交审批",
-      icon: "success",
-    });
-    emit("success", costId);
     visible.value = false;
+    emit("success", costId);
   } catch (error) {
     if (uploaded.length) {
       try {
@@ -512,15 +503,11 @@ async function submit() {
         console.warn("failed to clean up rejected expense uploads", cleanupError);
       }
     }
-    showError(error, "费用提交失败，请稍后重试");
+    submitError.value = getUserFacingErrorMessage(error, "费用暂未确认提交，请重试。");
   } finally {
     state.uploading = false;
     state.submitting = false;
   }
-}
-
-function close() {
-  if (!busy.value) visible.value = false;
 }
 
 function showError(error: unknown, fallback: string) {
@@ -533,184 +520,160 @@ function showError(error: unknown, fallback: string) {
 </script>
 
 <template>
-  <wd-popup
+  <MobileBottomSheet
     v-model="visible"
-    position="bottom"
-    :close-on-click-modal="!busy"
-    custom-style="width:100%;max-width:560px;margin-inline:auto;border-radius:24px 24px 0 0;overflow:hidden;padding-bottom:var(--mobile-safe-bottom,0px);"
+    :title="isEditing ? '修改费用上报' : '新增费用上报'"
+    close-label="关闭费用上报"
+    :busy="busy"
+    tall
   >
-    <view class="expense-sheet" role="dialog" aria-modal="true" :aria-label="isEditing ? '修改费用上报' : '新增费用上报'">
-      <view class="expense-sheet__header">
-        <text class="expense-sheet__title" role="heading" aria-level="2">{{ isEditing ? "修改费用上报" : "新增费用上报" }}</text>
-        <MobileAction
-          class="expense-sheet__close"
-          aria-label="关闭费用上报"
-          :disabled="busy"
-          @click="close"
-        ><TmsIcon name="close" size="20px" /></MobileAction>
+    <view class="expense-sheet__sections">
+      <view v-if="record?.reviewRemark" class="expense-sheet__reject-note mobile-inline-pair mobile-inline-pair--start">
+        <view class="mobile-inline-pair__icon" aria-hidden="true"><MobileIcon name="warning" size="16px" /></view>
+        <view class="expense-sheet__reject-copy">
+          <text>审批驳回说明</text>
+          <text>{{ record.reviewRemark }}</text>
+        </view>
       </view>
 
-      <scroll-view scroll-y class="expense-sheet__body">
-        <view class="expense-sheet__sections">
-          <view v-if="record?.reviewRemark" class="expense-sheet__reject-note">
-            <TmsIcon name="warning" size="18px" />
-            <view>
-              <text>审批驳回说明</text>
-              <text>{{ record.reviewRemark }}</text>
-            </view>
-          </view>
-
-          <view class="expense-field">
-            <text class="expense-field__title" role="heading" aria-level="3">费用明细</text>
-            <MobileField field="expense-item" label="费用项目" required>
-              <MobileSelect
-                v-model="form.expenseItemId"
-                field="expense-item"
-                class="expense-field__picker"
-                :options="expenseItemOptions"
-                label="选择费用项目"
-                placeholder="请选择费用项目"
-                :disabled="busy"
-              />
-            </MobileField>
-            <view class="expense-field--split">
-              <MobileField
-                v-model="form.amount"
-                field="expense-amount"
-                label="金额（元）"
-                inputmode="decimal"
-                placeholder="0.00"
-                :maxlength="12"
-                :disabled="busy"
-                required
-              />
-              <MobileField field="expense-date" label="发生日期" required>
-                <wd-cell
-                  id="expense-date"
-                  custom-class="tms-date-trigger expense-field__date"
-                  :value="formatLocalDate(form.occurredAt)"
-                  is-link
-                  role="button"
-                  :tabindex="busy ? -1 : 0"
-                  aria-label="选择费用发生日期"
-                  :aria-disabled="busy"
-                  @click="openDatePicker()"
-                  @keydown="handleDateKey($event)"
-                />
-                <wd-calendar
-                  v-model="form.occurredAt"
-                  v-model:visible="datePickerVisible"
-                  type="date"
-                  title="选择费用发生日期"
-                  switch-mode="year-month"
-                  :min-date="expenseDateMin"
-                  :max-date="expenseDateMax"
-                />
-              </MobileField>
-            </view>
-            <text class="expense-field__help">支持补录，请填写实际发生日期。</text>
-          </view>
-
-          <view class="expense-field">
-            <view class="expense-field__heading">
-              <text class="expense-field__title" role="heading" aria-level="3">费用凭证 <text class="required-mark">*</text></text>
-              <text class="expense-field__help">{{ attachments.length }}/5 张</text>
-            </view>
-            <text class="expense-field__help">请上传清晰、完整的票据、付款截图或现场凭证。</text>
-            <MobileEvidence
-              :images="attachmentImages"
-              label="费用凭证"
-              upload-label="添加费用凭证"
-              :uploading="state.choosing"
+      <view class="expense-field">
+        <text class="expense-field__title" role="heading" aria-level="3">费用明细</text>
+        <MobileField field="expense-item" label="费用项目" required>
+          <MobileSelect
+            v-model="form.expenseItemId"
+            field="expense-item"
+            class="expense-field__picker"
+            :options="expenseItemOptions"
+            label="选择费用项目"
+            placeholder="请选择费用项目"
+            :disabled="busy"
+          />
+        </MobileField>
+        <view class="expense-field--split">
+          <MobileField
+            v-model="form.amount"
+            field="expense-amount"
+            label="金额（元）"
+            inputmode="decimal"
+            placeholder="0.00"
+            :maxlength="12"
+            :disabled="busy"
+            required
+          />
+          <MobileField field="expense-date" label="发生日期" required>
+            <MobilePickerTrigger
+              id="expense-date"
+              label="选择费用发生日期"
+              :value="formatLocalDate(form.occurredAt)"
+              :expanded="datePickerVisible"
               :disabled="busy"
-              @upload="addAttachments"
-              @preview="previewAttachment"
-              @remove="removeAttachment"
+              @click="datePickerVisible = true"
             />
-            <view v-if="attachments.length && ocrEnabled" class="expense-ocr">
-              <view class="expense-field__heading">
-                <view class="expense-ocr__identity">
-                  <text>识别票据</text>
-                  <text class="expense-field__help">提取金额、日期、商户和支付方式。</text>
-                </view>
-                <MobileAction
-                  class="expense-ocr__analyze"
-                  variant="link"
-                  :disabled="busy || state.loadingAiConfig"
-                  @click="analyzeAttachments"
-                >{{ ocrActionLabel }}</MobileAction>
-              </view>
-              <view v-if="ocrResult" class="expense-ocr__result">
-                <text class="expense-field__help">可信度 {{ ocrConfidencePercent }}%{{ appliedOcrResult ? " · 已应用" : "" }}</text>
-                <text>{{ ocrResult.summary }}</text>
-                <text v-if="ocrResult.warnings.length" class="expense-ocr__warning">{{ ocrResult.warnings.slice(0, 2).join("；") }}</text>
-                <MobileAction class="expense-ocr__apply" variant="link" :disabled="busy" @click="applyOcrResult">
-                  {{ appliedOcrResult ? "重新应用识别结果" : "应用到费用表单" }}
-                </MobileAction>
-              </view>
-            </view>
-          </view>
+          </MobileField>
+        </view>
+        <text class="expense-field__help">支持补录，请填写实际发生日期。</text>
+      </view>
 
-          <view class="expense-field">
-            <text class="expense-field__title" role="heading" aria-level="3">补充信息</text>
-            <view class="expense-field__input-grid">
-              <MobileField
-                v-model="form.providerName"
-                field="expense-provider"
-                label="商户 / 收款方"
-                placeholder="选填"
-                :maxlength="100"
-                :disabled="busy"
-              />
-              <MobileField field="expense-payment" label="支付方式">
-                <MobileSelect
-                  v-model="form.paymentChannel"
-                  field="expense-payment"
-                  class="expense-field__compact-picker"
-                  :options="paymentMethodOptions"
-                  label="选择支付方式"
-                  :placeholder="paymentMethods.length ? '选填' : '暂无可用方式'"
-                  :disabled="busy || !paymentMethods.length"
-                />
-              </MobileField>
-              <MobileField
-                v-model="form.invoiceNo"
-                field="expense-invoice"
-                class="expense-field__invoice"
-                label="发票号码"
-                placeholder="选填"
-                :maxlength="100"
-                :disabled="busy"
-              />
+      <view class="expense-field">
+        <view class="expense-field__heading">
+          <text class="expense-field__title" role="heading" aria-level="3">费用凭证 <text class="required-mark">*</text></text>
+          <text class="expense-field__help">{{ attachments.length }}/5 张</text>
+        </view>
+        <text class="expense-field__help">请上传清晰、完整的票据、付款截图或现场凭证。</text>
+        <MobileEvidence
+          :images="attachmentImages"
+          label="费用凭证"
+          upload-label="添加费用凭证"
+          :uploading="state.choosing"
+          :disabled="busy"
+          @upload="addAttachments"
+          @preview="previewAttachment"
+          @remove="removeAttachment"
+        />
+        <view v-if="attachments.length && ocrEnabled" class="expense-ocr">
+          <view class="expense-field__heading">
+            <view class="expense-ocr__identity">
+              <text>识别票据</text>
+              <text class="expense-field__help">提取金额、日期、商户和支付方式。</text>
             </view>
-            <view class="expense-field__location-row">
-              <MobileField
-                v-model="form.expenseLocation"
-                field="expense-location"
-                label="费用发生地点"
-                placeholder="选填"
-                :maxlength="300"
-                :disabled="busy"
-              />
-              <MobileAction variant="link" :disabled="busy" @click="locateExpense">
-                <TmsIcon name="location" size="16px" />
-                <text>{{ state.locating ? "定位中…" : "当前位置" }}</text>
-              </MobileAction>
-            </view>
-            <MobileField
-              v-model="form.remark"
-              field="expense-remark"
-              label="费用说明"
-              placeholder="选填，可说明费用原因或异常情况…"
-              :maxlength="500"
-              :disabled="busy"
-              multiline
-            />
+            <MobileAction
+              class="expense-ocr__analyze"
+              variant="link"
+              :disabled="busy || state.loadingAiConfig"
+              @click="analyzeAttachments"
+            >{{ ocrActionLabel }}</MobileAction>
+          </view>
+          <view v-if="ocrResult" class="expense-ocr__result">
+            <text class="expense-field__help">可信度 {{ ocrConfidencePercent }}%{{ appliedOcrResult ? " · 已应用" : "" }}</text>
+            <text>{{ ocrResult.summary }}</text>
+            <text v-if="ocrResult.warnings.length" class="expense-ocr__warning">{{ ocrResult.warnings.slice(0, 2).join("；") }}</text>
+            <MobileAction class="expense-ocr__apply" variant="link" :disabled="busy" @click="applyOcrResult">
+              {{ appliedOcrResult ? "重新应用识别结果" : "应用到费用表单" }}
+            </MobileAction>
           </view>
         </view>
-      </scroll-view>
+      </view>
 
+      <view class="expense-field">
+        <text class="expense-field__title" role="heading" aria-level="3">补充信息</text>
+        <view class="expense-field__input-grid">
+          <MobileField
+            v-model="form.providerName"
+            field="expense-provider"
+            label="商户 / 收款方"
+            placeholder="选填"
+            :maxlength="100"
+            :disabled="busy"
+          />
+          <MobileField field="expense-payment" label="支付方式">
+            <MobileSelect
+              v-model="form.paymentChannel"
+              field="expense-payment"
+              class="expense-field__compact-picker"
+              :options="paymentMethodOptions"
+              label="选择支付方式"
+              :placeholder="paymentMethods.length ? '选填' : '暂无可用方式'"
+              :disabled="busy || !paymentMethods.length"
+            />
+          </MobileField>
+          <MobileField
+            v-model="form.invoiceNo"
+            field="expense-invoice"
+            class="expense-field__invoice"
+            label="发票号码"
+            placeholder="选填"
+            :maxlength="100"
+            :disabled="busy"
+          />
+        </view>
+        <view class="expense-field__location-row">
+          <MobileField
+            v-model="form.expenseLocation"
+            field="expense-location"
+            label="费用发生地点"
+            placeholder="选填"
+            :maxlength="300"
+            :disabled="busy"
+          />
+          <MobileAction variant="link" :disabled="busy" @click="locateExpense">
+            <MobileInlineLabel icon="location" :label="state.locating ? '定位中…' : '当前位置'" :icon-size="16" />
+          </MobileAction>
+        </view>
+        <MobileField
+          v-model="form.remark"
+          field="expense-remark"
+          label="费用说明"
+          placeholder="选填，可说明费用原因或异常情况…"
+          :maxlength="500"
+          :disabled="busy"
+          multiline
+        />
+      </view>
+    </view>
+
+    <template #footer>
       <view class="expense-sheet__footer">
+        <text v-if="submitError" class="mobile-dock__note mobile-dock__note--error" role="alert">{{ submitError }}</text>
         <text v-if="missingFields.length" class="expense-sheet__completion">还需补充：{{ missingFields.join("、") }}</text>
         <MobileAction
           class="mobile-dock__action tms-primary-action"
@@ -721,52 +684,24 @@ function showError(error: unknown, fallback: string) {
           {{ state.uploading ? "正在上传凭证…" : state.submitting ? "正在提交…" : isEditing ? "重新提交" : "提交审批" }}
         </MobileAction>
       </view>
-    </view>
-  </wd-popup>
+    </template>
+    <template #overlay>
+      <MobileCalendarDate
+        v-model="form.occurredAt"
+        v-model:visible="datePickerVisible"
+        title="选择费用发生日期"
+      />
+    </template>
+  </MobileBottomSheet>
 </template>
 
 <style scoped lang="scss">
-@use '@mobile-core/styles/workspace';
-
-.expense-sheet {
-  height: min(91vh, 800px);
-  height: min(91dvh, 800px);
-  @include workspace.limit-bottom-sheet();
-  display: flex;
-  flex-direction: column;
-  background: var(--mobile-workspace-canvas, #f2f3f6);
-  color: var(--tms-text-strong);
-}
-.expense-sheet__header, .expense-sheet__footer {
-  flex: none;
-  padding-inline: max(16px, var(--mobile-safe-left)) max(16px, var(--mobile-safe-right));
-  background: var(--tms-surface);
-}
-.expense-sheet__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding-block: 6px;
-  border-bottom: 1px solid var(--tms-line-subtle);
-}
-.expense-sheet__title { font-size: 20px; line-height: 1.25; font-weight: 750; letter-spacing: -.015em; }
-.mobile-action.expense-sheet__close {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  background: var(--tms-surface-soft);
-  color: var(--tms-muted);
-}
-.expense-sheet__body { min-height: 0; height: 0; flex: 1; }
 .expense-sheet__sections {
   display: grid;
   min-width: 0;
   gap: 12px;
   padding: 12px max(16px, var(--mobile-safe-right)) 16px max(16px, var(--mobile-safe-left));
+  color: var(--tms-text-strong);
 }
 .expense-field {
   display: grid;
@@ -791,17 +726,12 @@ function showError(error: unknown, fallback: string) {
   gap: 12px;
   align-items: start;
 }
-.expense-field__invoice { grid-column: 1 / -1; }
-.expense-field--split :deep(.tms-date-trigger) {
-  min-height: var(--tms-control-height);
-  height: auto;
-  margin-top: 0;
-  padding-inline: 12px;
-  border-radius: var(--tms-control-radius);
-  background: var(--tms-surface-soft);
+.expense-field--split {
+  /* Leave space for the full date and chevron at 320px. */
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 1fr);
 }
-.expense-field__location-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px; }
-.expense-field__location-row :deep(.mobile-action) { gap: 5px; }
+.expense-field__invoice { grid-column: 1 / -1; }
+.expense-field__location-row { --mobile-inline-pair-gap: 5px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px; }
 .expense-ocr { display: grid; min-width: 0; gap: 8px; padding-top: 8px; border-top: 1px solid var(--tms-line-subtle); }
 .expense-ocr__identity { min-width: 0; display: grid; gap: 3px; font-size: 14px; font-weight: 650; }
 .expense-ocr__identity .expense-field__help { font-weight: 400; }
@@ -818,15 +748,13 @@ function showError(error: unknown, fallback: string) {
 .expense-ocr__apply { justify-self: start; }
 .expense-ocr__warning { color: var(--tms-orange-strong); }
 .expense-sheet__reject-note {
-  display: flex;
-  gap: 8px;
+  --mobile-inline-pair-gap: 8px;
   padding: 12px;
   border-radius: 12px;
   color: var(--tms-red-strong);
   background: var(--tms-red-soft);
   font-size: 13px;
-  line-height: 1.5;
 }
-.expense-sheet__reject-note > view { display: grid; min-width: 0; gap: 4px; overflow-wrap: anywhere; }
-.expense-sheet__footer { display: grid; gap: 6px; padding-block: 8px 10px; border-top: 1px solid var(--tms-line-subtle); }
+.expense-sheet__reject-copy { display: grid; min-width: 0; gap: 4px; overflow-wrap: anywhere; }
+.expense-sheet__footer { display: grid; gap: 6px; }
 </style>

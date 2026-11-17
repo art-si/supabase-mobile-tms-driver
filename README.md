@@ -38,6 +38,10 @@ Art Supabase TMS 司机端是运输履约的一线移动工作台，基于 uni-a
 | 费用协同   | 费用项目、金额、日期、地点、票据、OCR 草稿、提交审批与审核状态    |
 | 车辆与我的 | 绑定车辆、证件状态、司机资料与账号退出                            |
 
+「我的」还提供提货预约、送货预约、异常报备、过磅记录、在途费用、司机认证和 AI 助手。过磅与在途费用沿用运单原有记录。AI 助手复用已部署的 Supabase `ai-assistant`，使用当前登录会话，不自动附带运单或档案。
+
+预约、异常报备和认证状态查询的司机专用 RPC 见 [数据库接口说明](supabase/review/README.md)。司机提交的是待调度处理的申请或报备，预计额外运费由后台复核。司机认证页面只读审核结果，材料补充沿用车队审核流程。
+
 ## 履约流程
 
 ```text
@@ -83,7 +87,9 @@ pnpm build:h5
 pnpm build:mp-weixin
 ```
 
-H5 生产文件输出到 `docs/`。微信小程序还需要在开发者工具和平台后台配置 AppID、合法域名、定位/相册/相机权限与手机号授权能力。
+`pnpm build:h5` 生成静态发布目录 `docs/`。提交产物后，在司机端的 GitHub 仓库按[分支发布说明](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site#publishing-from-a-branch)选择 **Settings → Pages → Deploy from a branch**，指定包含产物的分支和 `/docs`。生成的 `.nojekyll`、相对资源路径和哈希路由支持部署在仓库子路径。写入 `docs/` 时会排除高德安全密钥和 Web 服务密钥；公开构建的 Supabase 配置仅使用 publishable 或 anon key。
+
+微信小程序还需要在开发者工具和平台后台配置 AppID、合法域名、定位/相册/相机权限与手机号授权能力。
 若手机网络无法直连 Supabase，可将 `VITE_SUPABASE_MP_URL` 设为可直达的 HTTPS 代理域名；H5 仍使用 `VITE_SUPABASE_URL`。该域名须在小程序后台配置为 request、uploadFile 和 downloadFile 合法域名，并转发 `/auth/v1`、`/rest/v1`、`/functions/v1` 与 `/storage/v1`。
 
 ## 安全边界

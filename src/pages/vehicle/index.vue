@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import MobileWorkspace from '@mobile-core/components/MobileWorkspace.vue'
+import MobileEmptyState from '@mobile-core/components/MobileEmptyState.vue'
+import MobileLoadError from '@mobile-core/components/MobileLoadError.vue'
 import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import TmsBottomNav from '@/components/business/TmsBottomNav.vue'
-import TmsIcon from '@/components/business/TmsIcon.vue'
+import MobileIcon from '@mobile-core/components/MobileIcon.vue'
 import MobileAction from '@mobile-core/components/MobileAction.vue'
 import TmsPageSkeleton from '@mobile-core/components/TmsPageSkeleton.vue'
 import MobileTopBar from '@mobile-core/components/MobileTopBar.vue'
@@ -25,10 +27,10 @@ const loadError = ref('')
 const showSkeleton = computed(() => !profile.summary && (initialLoading.value || Boolean(loadError.value)))
 const approvedLoadTon = computed(() => normalizeVehicleLoadTon(vehicle.value?.approvedLoadMass))
 
-const vehicleTypeLabel = computed(() => dictionary.label('vehicleType', vehicle.value?.vehicleType))
-const fuelTypeLabel = computed(() => dictionary.label('vehicleFuelType', vehicle.value?.fuelType))
+const vehicleTypeLabel = computed(() => dictionary.findLabel('vehicleType', vehicle.value?.vehicleType))
+const fuelTypeLabel = computed(() => dictionary.findLabel('vehicleFuelType', vehicle.value?.fuelType) || '—')
 const vehicleStatusLabel = computed(() =>
-  dictionary.label('vehicleOperationStatus', vehicle.value?.operationStatus)
+  dictionary.findLabel('vehicleOperationStatus', vehicle.value?.operationStatus) || '状态待同步'
 )
 const auditStatusLabel = computed(() =>
   dictionary.findLabel('vehicleAuditStatus', vehicle.value?.auditStatus) ||
@@ -40,10 +42,7 @@ const auditStatusLabel = computed(() =>
   '待审核'
 )
 
-const vehicleDescription = computed(() => {
-  const type = vehicleTypeLabel.value === '--' ? '' : vehicleTypeLabel.value
-  return [type, vehicle.value?.brandModel].filter(Boolean).join(' · ')
-})
+const vehicleDescription = computed(() => [vehicleTypeLabel.value, vehicle.value?.brandModel].filter(Boolean).join(' · '))
 
 const vehicleFacts = computed(() => [
   {
@@ -80,19 +79,15 @@ async function load() {
 }
 
 function preview(url?: string) {
-  if (!url) {
-    uni.showToast({ title: '暂无证件图片', icon: 'none' })
-    return
-  }
-  uni.previewImage({ urls: [url] })
+  if (url) uni.previewImage({ urls: [url] })
 }
 </script>
 
 <template>
   <wd-config-provider :theme="themeName">
-    <MobileWorkspace class="page driver-page">
+    <MobileWorkspace container-class="page driver-page">
       <MobileTopBar title="车辆" capsule="always" />
-      <view class="driver-content driver-content--tabbed">
+      <view class="driver-content driver-content--tabbed" role="main">
         <TmsPageSkeleton
           v-if="showSkeleton"
           label="正在同步车辆档案…"
@@ -100,10 +95,7 @@ function preview(url?: string) {
           @retry="load"
         />
         <template v-else>
-          <view v-if="loadError" class="driver-card driver-heading vehicle-sync-error" role="alert">
-            <text class="driver-error">档案同步失败，当前显示上次的信息</text>
-            <MobileAction class="driver-inline" :disabled="syncing" @click="load">重试</MobileAction>
-          </view>
+          <MobileLoadError v-if="loadError" title="车辆档案同步失败" message="当前显示上次同步的信息。" @retry="load" />
 
           <template v-if="vehicle">
             <view class="driver-card vehicle-card">
@@ -131,25 +123,22 @@ function preview(url?: string) {
                   v-for="document in vehicleDocuments"
                   :key="document.icon"
                   class="mobile-row"
-                  :aria-label="`预览${document.label}`"
+                  :aria-label="document.url ? `预览${document.label}` : `${document.label}待上传`"
+                  :disabled="!document.url"
                   @click="preview(document.url)"
                 >
                   <view class="mobile-row__icon" aria-hidden="true">
-                    <TmsIcon :name="document.icon" size="17px" />
+                    <MobileIcon :name="document.icon" size="17px" />
                   </view>
                   <view class="mobile-row__body"><text class="mobile-row__label">{{ document.label }}</text></view>
                   <text class="mobile-row__trailing mobile-row__detail">{{ document.url ? '已上传' : '待上传' }}</text>
-                  <TmsIcon class="mobile-row__chevron" name="chevron" size="14px" aria-hidden="true" />
+                  <MobileIcon v-if="document.url" class="mobile-row__chevron" name="chevron" size="14px" />
                 </MobileAction>
               </view>
             </view>
           </template>
 
-          <view v-else class="driver-card driver-empty">
-            <view class="driver-empty__icon" aria-hidden="true"><TmsIcon name="vehicle" size="22px" /></view>
-            <text class="section-title" role="heading" aria-level="2">暂无绑定车辆</text>
-            <text class="driver-copy">绑定车辆后可查看档案与证件。</text>
-          </view>
+          <MobileEmptyState v-else class="driver-card" icon="vehicle" title="暂无绑定车辆" description="绑定车辆后可查看档案与证件。" />
         </template>
       </view>
       <TmsBottomNav active="vehicle" />
@@ -177,11 +166,4 @@ function preview(url?: string) {
   font-variant-numeric: tabular-nums;
 }
 
-.vehicle-sync-error {
-  padding-block: 6px;
-}
-
-.vehicle-sync-error .driver-inline {
-  flex-shrink: 0;
-}
 </style>

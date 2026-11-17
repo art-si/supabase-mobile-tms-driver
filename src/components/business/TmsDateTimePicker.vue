@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import TmsIcon from './TmsIcon.vue'
+import MobileAction from '@mobile-core/components/MobileAction.vue'
+import MobileBottomSheet from '@mobile-core/components/MobileBottomSheet.vue'
+import MobileCalendarDate from '@mobile-core/components/MobileCalendarDate.vue'
+import MobilePickerTrigger from '@mobile-core/components/MobilePickerTrigger.vue'
 
 defineOptions({ options: { styleIsolation: 'shared' } })
 
@@ -19,8 +22,6 @@ const dateVisible = ref(false)
 const draftDate = ref(Date.now())
 const hour = ref('')
 const minute = ref('')
-const calendarMin = new Date(new Date().getFullYear() - 5, 0, 1).getTime()
-const calendarMax = new Date(new Date().getFullYear() + 1, 11, 31, 23, 59, 59).getTime()
 
 const popupVisible = computed({
   get: () => props.visible,
@@ -38,7 +39,10 @@ const canConfirm = computed(() => {
 watch(
   () => props.visible,
   (visible) => {
-    if (!visible) return
+    if (!visible) {
+      dateVisible.value = false
+      return
+    }
     const date = new Date(props.modelValue)
     draftDate.value = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
     hour.value = String(date.getHours()).padStart(2, '0')
@@ -56,91 +60,44 @@ function confirm() {
 </script>
 
 <template>
-  <wd-popup
-    v-model="popupVisible"
-    position="bottom"
-    custom-style="border-radius: 28rpx 28rpx 0 0; overflow: hidden; padding-bottom: var(--mobile-safe-bottom, 0px);"
-  >
-    <view class="datetime-sheet">
-      <view class="datetime-sheet__header">
-        <text class="datetime-sheet__title">{{ title }}</text>
-        <wd-button
-          custom-class="datetime-sheet__close"
-          type="text"
-          aria-label="关闭时间选择"
-          @click="popupVisible = false"
-        >
-          <TmsIcon name="close" size="32rpx" />
-        </wd-button>
-      </view>
-      <view class="datetime-sheet__body">
-        <text class="datetime-sheet__label">日期</text>
-        <wd-cell
-          custom-class="tms-date-trigger datetime-sheet__date"
-          :value="dateLabel"
-          is-link
-          aria-label="选择日期"
-          @click="dateVisible = true"
-        />
-        <wd-calendar
-          v-model="draftDate"
-          v-model:visible="dateVisible"
-          type="date"
-          title="选择日期"
-          switch-mode="year-month"
-          :min-date="calendarMin"
-          :max-date="calendarMax"
-        />
-        <text class="datetime-sheet__label datetime-sheet__time-label">时间 · 24 小时制</text>
-        <view class="datetime-sheet__time">
-          <view class="datetime-sheet__time-field">
-            <wd-input v-model="hour" type="number" inputmode="numeric" :maxlength="2" aria-label="小时" placeholder="时" />
-            <text>小时</text>
-          </view>
-          <text class="datetime-sheet__colon">:</text>
-          <view class="datetime-sheet__time-field">
-            <wd-input v-model="minute" type="number" inputmode="numeric" :maxlength="2" aria-label="分钟" placeholder="分" />
-            <text>分钟</text>
-          </view>
+  <MobileBottomSheet v-model="popupVisible" :title="title" close-label="关闭时间选择">
+    <view class="datetime-sheet__body">
+      <text class="datetime-sheet__label">日期</text>
+      <MobilePickerTrigger
+        class="datetime-sheet__date"
+        label="选择日期"
+        :value="dateLabel"
+        :expanded="dateVisible"
+        @click="dateVisible = true"
+      />
+      <text class="datetime-sheet__label datetime-sheet__time-label">时间 · 24 小时制</text>
+      <view class="datetime-sheet__time">
+        <view class="datetime-sheet__time-field">
+          <wd-input v-model="hour" type="number" inputmode="numeric" :maxlength="2" aria-label="小时" placeholder="时" />
+          <text>小时</text>
+        </view>
+        <text class="datetime-sheet__colon">:</text>
+        <view class="datetime-sheet__time-field">
+          <wd-input v-model="minute" type="number" inputmode="numeric" :maxlength="2" aria-label="分钟" placeholder="分" />
+          <text>分钟</text>
         </view>
       </view>
-      <view class="datetime-sheet__footer">
-        <wd-button custom-class="tms-secondary-action" type="primary" variant="plain" :round="false" @click="popupVisible = false">取消</wd-button>
-        <wd-button custom-class="tms-primary-action" type="primary" :round="false" :disabled="!canConfirm" @click="confirm">确定</wd-button>
-      </view>
     </view>
-  </wd-popup>
+    <template #footer>
+      <view class="datetime-sheet__footer">
+        <MobileAction class="tms-secondary-action" @click="popupVisible = false">取消</MobileAction>
+        <MobileAction class="tms-primary-action" :disabled="!canConfirm" @click="confirm">确定</MobileAction>
+      </view>
+    </template>
+    <template #overlay>
+      <MobileCalendarDate v-model="draftDate" v-model:visible="dateVisible" title="选择日期" />
+    </template>
+  </MobileBottomSheet>
 </template>
 
 <style scoped lang="scss">
-.datetime-sheet {
-  background: var(--tms-surface);
-  backdrop-filter: blur(22rpx) saturate(140%);
-  -webkit-backdrop-filter: blur(22rpx) saturate(140%);
-}
-.datetime-sheet__header {
-  min-height: 104rpx;
-  padding: 24rpx 30rpx;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1rpx solid var(--tms-line-subtle);
-}
-.datetime-sheet__title {
-  color: var(--tms-text);
-  font-size: 30rpx;
-  font-weight: 700;
-}
-.datetime-sheet__header :deep(.datetime-sheet__close) {
-  width: 64rpx;
-  min-width: 44px;
-  height: 64rpx;
-  min-height: 44px;
-  padding: 0;
-  color: var(--tms-muted);
-}
 .datetime-sheet__body {
-  padding: 26rpx 30rpx 32rpx;
+  padding: 14px max(16px, var(--mobile-safe-right)) 16px max(16px, var(--mobile-safe-left));
 }
 .datetime-sheet__label {
   display: block;
@@ -195,16 +152,8 @@ function confirm() {
   font-weight: 700;
 }
 .datetime-sheet__footer {
-  padding: 20rpx 30rpx;
   display: grid;
-  grid-template-columns: 1fr 1.7fr;
-  gap: 16rpx;
-  border-top: 1rpx solid var(--tms-line);
-}
-.datetime-sheet__footer :deep(.wd-button) {
-  height: var(--tms-control-height);
-  border-radius: var(--tms-control-radius);
-  font-size: var(--tms-control-font-size);
-  font-weight: 700;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 8px;
 }
 </style>
