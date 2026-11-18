@@ -183,9 +183,6 @@ function removePhoto(index: number) {
   form.photoUrls.splice(index, 1);
 }
 
-function preview(index: number) {
-  uni.previewImage({ current: form.photoUrls[index], urls: form.photoUrls });
-}
 
 async function submit() {
   if (!canSubmit.value) return;
@@ -287,7 +284,6 @@ function showError(error: unknown, fallback: string) {
             :label="photoLabel"
             :uploading="state.uploading"
             :disabled="submissionLocked"
-            @preview="preview"
             @remove="removePhoto"
             @upload="uploadPhotos"
           />

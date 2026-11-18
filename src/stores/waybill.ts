@@ -14,7 +14,6 @@ import type {
   WaybillEvent,
   WaybillProof,
 } from "@/api/types";
-import { syncDriverWaybills } from "@/api/supabase";
 import { useAuthStore } from "./auth";
 import { useDictionaryStore } from "./dictionary";
 
@@ -25,7 +24,6 @@ interface WaybillState {
   actionLoading: boolean;
 }
 
-const pendingSyncs = new Map<string, Promise<unknown>>();
 const detailRequests = createLatestRequest();
 
 export const useWaybillStore = defineStore("waybill", {
@@ -36,15 +34,6 @@ export const useWaybillStore = defineStore("waybill", {
     actionLoading: false,
   }),
   actions: {
-    syncAssignedWaybills(token: string) {
-      const running = pendingSyncs.get(token);
-      if (running) return running;
-      const request = syncDriverWaybills(token)
-        .catch((error) => console.warn("sync driver waybills failed", error))
-        .finally(() => pendingSyncs.delete(token));
-      pendingSyncs.set(token, request);
-      return request;
-    },
     async ensureSession() {
       const auth = useAuthStore();
       if (!(await auth.ensureValidSession())) throw new Error("请先登录");
@@ -52,12 +41,10 @@ export const useWaybillStore = defineStore("waybill", {
     },
     async loadList(group: WaybillStatusGroup) {
       const auth = await this.ensureSession();
-      await this.syncAssignedWaybills(auth.token);
       return auth.withFreshAccess((token) => listWaybills(token, { group }));
     },
     async loadHomeTask() {
       const auth = await this.ensureSession();
-      await this.syncAssignedWaybills(auth.token);
       for (const group of ["active", "pending", "all"] as const) {
         const [task] = await auth.withFreshAccess((token) => listWaybills(token, { group, limit: 1 }));
         if (task) return task;

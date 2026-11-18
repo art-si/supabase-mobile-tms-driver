@@ -57,7 +57,7 @@ page.on('dialog', async dialog => {
 page.on('pageerror', error => pageErrors.push(error.message))
 
 async function visit(path, ready) {
-  const closePreview = page.locator('#u-a-p > div > div[style*="cursor: pointer"]')
+  const closePreview = page.getByRole('button', { name: '关闭预览', exact: true })
   if (await closePreview.isVisible()) {
     await closePreview.click()
     await closePreview.waitFor({ state: 'hidden' })
@@ -94,7 +94,7 @@ async function step(name, action, options = {}) {
   const toast = await page.locator('.uni-toast, .wd-toast, uni-modal, .uni-modal').allTextContents().catch(() => [])
   const layout = await page.evaluate(() => ({ width: innerWidth, documentWidth: document.documentElement.scrollWidth })).catch(() => null)
   const openPages = context.pages().map(tab => tab.url())
-  const previewCount = await page.locator('#u-a-p > *, #u-a-p div[style*="position: fixed"]').count().catch(() => 0)
+  const previewCount = await page.locator('dialog.mobile-image-viewer[open]').count().catch(() => 0)
   const domEvents = await page.evaluate(() => window.__auditDomEvents || null).catch(() => null)
   const globalEvents = await page.evaluate(() => window.__auditGlobalEvents || null).catch(() => null)
   const previewDom = await page.evaluate(() => {
@@ -259,8 +259,9 @@ try {
       await action('费用记录').click()
       if (await timeline.getByRole('heading', { name: '装货信息已提交' }).count()) throw new Error('Expense filter still shows transport events')
       await action('查看 5 张凭证').click()
-      await page.waitForFunction(() => document.querySelectorAll('#u-a-p uni-swiper-item').length === 5)
-      await page.locator('#u-a-p > div > div[style*="cursor: pointer"]').click()
+      const preview = page.getByRole('dialog', { name: '预览凭证', exact: true })
+      await preview.getByRole('status').getByText('1 / 5', { exact: true }).waitFor()
+      await preview.getByRole('button', { name: '关闭预览', exact: true }).click()
       await action('运输节点').click()
       await timeline.getByText('时间未记录', { exact: true }).waitFor()
       await action('展开装货信息已提交明细').click()
@@ -292,8 +293,8 @@ try {
       await page.getByRole('heading', { name: '装货过磅' }).waitFor()
       await page.getByRole('heading', { name: '卸货过磅' }).waitFor()
       await page.getByRole('button', { name: '预览第 1 张装货磅单', exact: true }).click()
-      await page.locator('#u-a-p uni-swiper-item').waitFor()
-      await page.locator('#u-a-p > div > div[style*="cursor: pointer"]').click()
+      const preview = page.getByRole('dialog', { name: '预览装货磅单', exact: true })
+      await preview.getByRole('button', { name: '关闭预览', exact: true }).click()
       if (process.env.TMS_AUDIT_STATE === 'weighbridge-partial') {
         await page.getByText('卸货过磅资料暂时不可用', { exact: true }).waitFor()
         const retry = page.getByRole('button', { name: '重试卸货过磅资料', exact: true })
@@ -539,7 +540,7 @@ try {
   await visit(detailUrl, detailReady)
   const openProof = async (control) => {
     await control.click()
-    await page.locator('#u-a-p > div:has(uni-swiper)').waitFor({ state: 'visible' })
+    await page.getByRole('dialog', { name: '预览运输单据', exact: true }).waitFor({ state: 'visible' })
   }
   const detailControls = await page.evaluate(() =>
     ['.detail-actions .detail-operation', '.route-card--detail .driver-inline', '[aria-label$="张运输单据"]', '.route-card__nav']
@@ -717,6 +718,27 @@ try {
     await page.locator('.mine-help__panel').waitFor({ state: 'visible' })
   })
   await step('mine-help-close', () => page.locator('.mine-help__done').click())
+  const regularViewport = page.viewportSize()
+  await page.setViewportSize({ width: 320, height: 320 })
+  await step('mine-help-short-screen', async () => {
+    await page.getByRole('button', { name: '使用说明', exact: true }).click()
+    const help = page.getByRole('dialog', { name: '使用说明', exact: true })
+    await help.waitFor()
+    await page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => undefined))))
+    const done = await help.locator('.mine-help__done').boundingBox()
+    if (!done || done.y < 0 || done.y + done.height > 320) throw new Error('Help action must remain visible on a short screen')
+    const body = help.locator('.mobile-sheet__body')
+    await body.hover()
+    await page.mouse.wheel(0, 1000)
+    await page.waitForFunction(() => {
+      const body = document.querySelector('[role="dialog"][aria-label="使用说明"] .mobile-sheet__body')?.getBoundingClientRect()
+      const last = document.querySelector('.mine-help__steps > :last-child')?.getBoundingClientRect()
+      return body && last && last.bottom <= body.bottom + 1 && last.bottom > body.top
+    })
+    await help.locator('.mine-help__done').click()
+    await help.waitFor({ state: 'hidden' })
+  })
+  await page.setViewportSize(regularViewport)
   await step('mine-expenses', async () => {
       await page.getByRole('button', { name: '在途费用', exact: true }).click()
     await page.waitForURL(/index\?service=expense/)

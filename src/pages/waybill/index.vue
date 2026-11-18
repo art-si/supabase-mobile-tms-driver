@@ -215,6 +215,8 @@ function openWaybill(item: Waybill) {
 }
 
 .waybill-refresh.mobile-action {
+  align-self: start;
+  margin-top: 4px;
   color: var(--mobile-workspace-accent);
   background: var(--mobile-workspace-surface);
   border: 1px solid var(--mobile-workspace-line);

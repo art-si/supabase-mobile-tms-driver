@@ -145,7 +145,6 @@ async function showRecords() {
               <MobileSelect
                 v-model="form[item.field]" :field="`driver-exception-${item.field}`" :label="item.label"
                 :placeholder="`请选择${item.label}…`" :options="item.options" :disabled="submitting"
-                :invalid="Boolean(errors[item.field])" :described-by="errors[item.field] ? `driver-exception-${item.field}-error` : undefined"
                 @select="clearError(item.field)"
               />
             </MobileField>
@@ -155,8 +154,6 @@ async function showRecords() {
               id="driver-exception-time" label="发生时间" placeholder="选择日期和时间…"
               :value="occurredAt" :expanded="dateOpen" :disabled="submitting"
               :description="occurredAt ? `当前时间：${occurredAt}` : undefined"
-              :invalid="Boolean(errors.time)"
-              :described-by="errors.time ? 'driver-exception-time-error' : undefined"
               @click="dateOpen = true"
             />
           </MobileField>

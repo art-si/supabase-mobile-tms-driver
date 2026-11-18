@@ -90,6 +90,8 @@ pnpm build:mp-weixin
 `pnpm build:h5` 生成静态发布目录 `docs/`。提交产物后，在司机端的 GitHub 仓库按[分支发布说明](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site#publishing-from-a-branch)选择 **Settings → Pages → Deploy from a branch**，指定包含产物的分支和 `/docs`。生成的 `.nojekyll`、相对资源路径和哈希路由支持部署在仓库子路径。写入 `docs/` 时会排除高德安全密钥和 Web 服务密钥；公开构建的 Supabase 配置仅使用 publishable 或 anon key。
 
 微信小程序还需要在开发者工具和平台后台配置 AppID、合法域名、定位/相册/相机权限与手机号授权能力。
+
+账号由后台「用户管理 → 移动端账号」关联到具体司机档案，承运商归属从档案带出。修改联系手机号不会改变司机身份。密码登录使用 `driver-auth`；微信登录和绑定使用 Pro 维护的统一 `mobile-wechat-auth`。首次密码登录后，10 分钟内在「我的」绑定本人微信手机号；之后可一键登录。构建设置 `VITE_ENABLE_WECHAT_PHONE_LOGIN=true`。未关联或停用的司机不能登录，现有会话也停止业务访问。运单直接读取司机专用 RPC，无需额外的同步接口。配置说明见主仓 `supabase/README.md`。
 若手机网络无法直连 Supabase，可将 `VITE_SUPABASE_MP_URL` 设为可直达的 HTTPS 代理域名；H5 仍使用 `VITE_SUPABASE_URL`。该域名须在小程序后台配置为 request、uploadFile 和 downloadFile 合法域名，并转发 `/auth/v1`、`/rest/v1`、`/functions/v1` 与 `/storage/v1`。
 
 ## 安全边界

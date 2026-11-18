@@ -429,12 +429,13 @@ async function handleSignatureSuccess() {
   }
 }
 
-function viewReceipt(current?: string) {
+const proofEvidence = ref<InstanceType<typeof MobileEvidence>>();
+function viewReceipt() {
   if (proofUrls.value.length === 0) {
     uni.showToast({ title: "暂无回单文件", icon: "none" });
     return;
   }
-  uni.previewImage({ current: current || proofUrls.value[0], urls: proofUrls.value });
+  proofEvidence.value?.preview();
 }
 </script>
 
@@ -534,7 +535,7 @@ function viewReceipt(current?: string) {
               <text class="driver-copy">{{ proofUrls.length }} 份</text>
             </view>
             <view class="driver-card">
-              <MobileEvidence readonly :images="proofUrls" label="运输单据" @preview="viewReceipt(proofUrls[$event])" />
+              <MobileEvidence ref="proofEvidence" readonly :images="proofUrls" label="运输单据" />
             </view>
           </view>
           <view v-if="!isPending && current.status !== 'cancelled'" class="mobile-group">

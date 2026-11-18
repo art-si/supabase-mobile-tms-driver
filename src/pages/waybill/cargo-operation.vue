@@ -365,10 +365,6 @@ async function uploadEvidence(kind: "photo" | "ticket") {
   }
 }
 
-function preview(url: string | undefined, urls: string[]) {
-  if (!url) return;
-  uni.previewImage({ current: url, urls });
-}
 
 function removeEvidence(kind: "photo" | "ticket", index: number) {
   if (isCompleted.value || state.uploading || state.submitting || state.analyzing) return;
@@ -577,7 +573,6 @@ function showError(error: unknown, fallback: string) {
               :disabled="Boolean(state.uploading) || state.submitting || state.analyzing"
               :uploading="state.uploading === 'photo'"
               @upload="uploadEvidence('photo')"
-              @preview="preview(form.photoUrls[$event], form.photoUrls)"
               @remove="removeEvidence('photo', $event)"
             />
           </view>
@@ -597,7 +592,6 @@ function showError(error: unknown, fallback: string) {
               :disabled="Boolean(state.uploading) || state.submitting || state.analyzing"
               :uploading="state.uploading === 'ticket'"
               @upload="uploadEvidence('ticket')"
-              @preview="preview(form.weighbridgeTicketUrls[$event], form.weighbridgeTicketUrls)"
               @remove="removeEvidence('ticket', $event)"
             />
             <view v-if="form.recognitionInfo || (!isCompleted && form.weighbridgeTicketUrls.length)" class="cargo-ocr">
@@ -658,6 +652,7 @@ function showError(error: unknown, fallback: string) {
 </template>
 
 <style scoped lang="scss">
+@use '@mobile-core/styles/form';
 .cargo-checkin { display: flex; min-width: 0; align-items: center; gap: 10px; }
 .cargo-checkin__icon {
   width: 40px;
@@ -677,7 +672,7 @@ function showError(error: unknown, fallback: string) {
 .cargo-policy, .cargo-ocr { padding-top: 10px; border-top: 1px solid var(--mobile-workspace-line); }
 .cargo-policy__title, .cargo-ocr__title { font-size: 14px; font-weight: 700; }
 .cargo-locked { --mobile-inline-pair-gap: 8px; --mobile-inline-pair-leading: 1.55; display: flex; }
-.cargo-weight-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 12px; }
+.cargo-weight-grid { @include form.field-grid; }
 .cargo-weight-warning { color: var(--tms-orange-strong); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
 .cargo-ocr { display: grid; gap: 8px; }
 .cargo-ocr__raw {

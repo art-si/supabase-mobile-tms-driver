@@ -5,7 +5,10 @@ import { onShow } from '@dcloudio/uni-app'
 import TmsBottomNav from '@/components/business/TmsBottomNav.vue'
 import MobileIcon from '@mobile-core/components/MobileIcon.vue'
 import MobileAction from '@mobile-core/components/MobileAction.vue'
+import MobileBottomSheet from '@mobile-core/components/MobileBottomSheet.vue'
 import MobileAccountIdentity from '@mobile-core/components/MobileAccountIdentity.vue'
+import MobileWechatPhoneBinding from '@mobile-core/components/MobileWechatPhoneBinding.vue'
+import { isWechatPhoneLoginEnabled } from '@mobile-core/wechat-phone-login'
 import MobileLoadError from '@mobile-core/components/MobileLoadError.vue'
 import MobileSectionHeading from '@mobile-core/components/MobileSectionHeading.vue'
 import MobileSignOutDialog from '@mobile-core/components/MobileSignOutDialog.vue'
@@ -36,11 +39,7 @@ const logoutConfirmVisible = ref(false)
 const showSkeleton = computed(() => !profile.summary && (initialLoading.value || Boolean(loadError.value)))
 
 type PopupPanel = HTMLElement | { $el?: unknown }
-const helpPanel = ref<PopupPanel>()
 const contactPanel = ref<PopupPanel>()
-useOverlayFocus(helpVisible, {
-  panel: () => helpPanel.value, cancel: () => { helpVisible.value = false }
-})
 useOverlayFocus(contactNoticeVisible, {
   panel: () => contactPanel.value, cancel: () => { contactNoticeVisible.value = false }
 })
@@ -205,6 +204,7 @@ async function confirmLogout() {
           <view class="mobile-group-section">
             <MobileSectionHeading title="设置与账号" />
             <view class="mobile-group">
+              <MobileWechatPhoneBinding v-if="isWechatPhoneLoginEnabled && auth.isLoggedIn" :key="auth.user?.id" :bind-phone="auth.bindWechatPhone" />
               <MobileAction class="mobile-row" aria-label="打开设置，管理主题配色" @click="openSettings">
                 <view class="mobile-row__icon" aria-hidden="true"><MobileIcon name="settings" size="17px" /></view>
                 <view class="mobile-row__body"><text class="mobile-row__label">主题配色</text></view>
@@ -222,25 +222,20 @@ async function confirmLogout() {
 
       <TmsBottomNav active="mine" />
 
-      <wd-popup v-model="helpVisible" position="bottom" round :z-index="60"
-        custom-style="padding-bottom:var(--mobile-safe-bottom,0px);"
+      <MobileBottomSheet v-model="helpVisible" title="使用说明" close-label="关闭使用说明" :z-index="60"
       >
-        <view ref="helpPanel" class="mine-help__panel" role="dialog" aria-modal="true" aria-label="使用说明" tabindex="-1">
-          <view class="driver-heading">
-            <text class="section-title" role="heading" aria-level="2">使用说明</text>
-            <MobileAction class="mine-icon-button" variant="icon" aria-label="关闭使用说明" @click="helpVisible = false">
-              <MobileIcon name="close" size="16px" />
-            </MobileAction>
-          </view>
+        <view class="mine-help__panel">
           <view class="mine-help__steps">
             <view><text>1</text><text>在运单列表核对站点与货物信息，接受任务。</text></view>
             <view><text>2</text><text>到达装货地打卡，填写重量并上传照片与磅单。</text></view>
             <view><text>3</text><text>录入发车信息。到达后完成卸货、签收和回单上传。</text></view>
             <view><text>4</text><text>录入收车里程与车辆照片。垫付费用可在运单内上报。</text></view>
           </view>
-          <MobileAction class="tms-primary-action mine-modal-action mine-help__done" @click="helpVisible = false">我知道了</MobileAction>
         </view>
-      </wd-popup>
+        <template #footer>
+          <MobileAction class="tms-primary-action mine-modal-action mine-help__done" @click="helpVisible = false">我知道了</MobileAction>
+        </template>
+      </MobileBottomSheet>
 
       <wd-popup v-model="contactNoticeVisible" position="center" round :z-index="70"
       >
@@ -257,8 +252,6 @@ async function confirmLogout() {
 </template>
 
 <style scoped lang="scss">
-@use '@mobile-core/styles/workspace';
-
 .mine-page__content {
   display: grid;
   min-width: 0;
@@ -275,21 +268,15 @@ async function confirmLogout() {
 }
 
 .mine-help__panel {
-  max-width: 560px;
-  max-height: 80vh;
-  @include workspace.limit-bottom-sheet(80vh);
-  margin-inline: auto;
-  padding: 16px max(20px, var(--mobile-safe-right)) 20px max(20px, var(--mobile-safe-left));
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  padding: 16px max(16px, var(--mobile-safe-right)) 20px max(16px, var(--mobile-safe-left));
 }
 
 .mine-help__steps {
   display: grid;
   gap: 12px;
-  margin: 8px 0 20px;
+  margin: 0;
   color: var(--mobile-workspace-muted);
-  font-size: 14px;
+  font-size: max(14px, .875rem);
   line-height: 1.5;
 }
 

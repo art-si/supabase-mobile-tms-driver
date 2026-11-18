@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onLoad } from '@dcloudio/uni-app'
 import MobileLogin from '@mobile-core/components/MobileLogin.vue'
+import { isWechatPhoneLoginEnabled, wechatPhoneLoginError } from '@mobile-core/wechat-phone-login'
 import { getUserFacingErrorMessage } from '@/api/supabase'
 import { usePageTheme } from '@/composables/usePageTheme'
 import { useAuthStore } from '@/stores/auth'
@@ -23,22 +24,28 @@ function openHome() {
   uni.reLaunch({ url: '/pages/home/index' })
 }
 
-onLoad(() => {
+onLoad(async () => {
   auth.hydrate()
-  if (auth.isLoggedIn) openHome()
+  if (!auth.isLoggedIn) return
+  try {
+    if (!(await auth.ensureValidSession(false))) return
+    await profile.load(true)
+    openHome()
+  } catch {
+    auth.clearSession()
+  }
 })
 
 async function authenticate(account: string, password: string) {
   await auth.login(account, password)
-  await profile.load(true)
 }
 
 async function authenticatePhone(code: string) {
   await auth.loginWithWechatPhone(code)
-  await profile.load(true)
 }
 
 function explainError(error: unknown, channel?: 'phone') {
+  if (channel === 'phone') return wechatPhoneLoginError(error)
   return getUserFacingErrorMessage(
     error,
     channel === 'phone' ? '手机号登录暂不可用，请使用账号密码登录' : '登录失败，请检查账号与密码'
@@ -57,7 +64,7 @@ function explainError(error: unknown, channel?: 'phone') {
     help-text="司机账号由车队管理员开通与管理"
     forgot-password-text="请联系车队管理员重置密码"
     :authenticate="authenticate"
-    :authenticate-phone="authenticatePhone"
+    :authenticate-phone="isWechatPhoneLoginEnabled ? authenticatePhone : undefined"
     :explain-error="explainError"
     @success="openHome"
   />

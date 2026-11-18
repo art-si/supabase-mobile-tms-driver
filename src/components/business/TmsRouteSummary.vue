@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import MobileRoute from '@mobile-core/components/MobileRoute.vue'
+import MobileRouteMeta from '@mobile-core/components/MobileRouteMeta.vue'
 import type { Waybill } from '@/api/types'
 import { formatDateTime, formatDuration, formatKm, formatTon } from '@/utils/format'
 import { getEstimatedDurationMin, getRouteDistanceKm } from '@/utils/route'
@@ -35,12 +36,12 @@ const originStation = computed(() => props.variant === 'compact' && props.waybil
 
 <template>
   <view class="route-summary" :class="`route-summary--${variant}`">
-    <view class="route-summary__head">
-      <view v-if="variant === 'detail'" class="route-summary__detail-route">
+    <view class="route-summary__head mobile-card-identity">
+      <view v-if="variant === 'detail'" class="route-summary__detail-route mobile-card-identity__main">
         <MobileRoute :origin="origin" :destination="destination" />
       </view>
-      <text v-else-if="heading" class="route-summary__label">{{ heading }}</text>
-      <text v-else class="route-summary__label route-summary__number" translate="no">{{ waybill.waybillNo || '暂无运单号' }}</text>
+      <text v-else-if="heading" class="route-summary__label mobile-card-identity__main">{{ heading }}</text>
+      <text v-else class="route-summary__label route-summary__number mobile-card-identity__main" translate="no">{{ waybill.waybillNo || '暂无运单号' }}</text>
       <TmsStatusTag v-if="showStatus" :status="waybill.status" />
     </view>
 
@@ -64,7 +65,7 @@ const originStation = computed(() => props.variant === 'compact' && props.waybil
 
     <slot name="operations" />
 
-    <view
+    <MobileRouteMeta
       v-if="heading || cargoNo || originStation || waybill.cargoName || waybill.cargoWeightTon || duration !== undefined"
       class="route-summary__meta"
     >
@@ -75,12 +76,12 @@ const originStation = computed(() => props.variant === 'compact' && props.waybil
       <text v-if="waybill.cargoWeightTon">{{ formatTon(waybill.cargoWeightTon) }}</text>
       <text v-if="duration !== undefined">预计 {{ formatDuration(duration) }}</text>
       <text v-if="distance !== undefined">{{ distanceLabel }} {{ formatKm(distance) }}</text>
-    </view>
+    </MobileRouteMeta>
 
-    <view v-if="showSchedule && (loadTime || unloadTime)" class="route-summary__schedule">
+    <MobileRouteMeta v-if="showSchedule && (loadTime || unloadTime)">
       <text v-if="loadTime">计划装货 {{ formatDateTime(loadTime) }}</text>
       <text v-if="unloadTime">计划卸货 {{ formatDateTime(unloadTime) }}</text>
-    </view>
+    </MobileRouteMeta>
   </view>
 </template>
 
@@ -95,20 +96,11 @@ const originStation = computed(() => props.variant === 'compact' && props.waybil
   overflow-wrap: anywhere;
 }
 
-.route-summary__head {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.route-summary__label { font-size: 13px; font-weight: 660; line-height: 1.35; }
-.route-summary__number, .route-summary__schedule { font-variant-numeric: tabular-nums; }
-.route-summary__route { --mobile-route-size: clamp(16px, 4.7vw, 20px); }
+.route-summary__label { font-size: max(13px, .8125rem); font-weight: 660; line-height: 1.35; }
+.route-summary__number { font-variant-numeric: tabular-nums; }
+.route-summary__route { --mobile-route-size: max(1rem, clamp(16px, 4.7vw, 20px)); }
 .route-summary--task .route-summary__route { --mobile-route-size: clamp(1.25rem, 5.7vw, 1.625rem); }
 .route-summary--task .route-summary__label { color: var(--mobile-workspace-ink, var(--tms-text-strong)); }
-.route-summary--detail .route-summary__head { flex-wrap: wrap; }
 .route-summary__detail-route {
   --mobile-route-size: clamp(1.25rem, 6.3vw, 1.625rem);
   flex: 1 1 10.5rem;
@@ -118,14 +110,14 @@ const originStation = computed(() => props.variant === 'compact' && props.waybil
 .route-summary__next-stop {
   --mobile-inline-pair-gap: 8px;
   --mobile-inline-pair-leading: 1.45;
-  font-size: 14px;
+  font-size: max(14px, .875rem);
 }
 .route-summary__address, .route-summary__next-address { min-width: 0; }
 .route-summary__next-address { color: var(--mobile-workspace-ink, var(--tms-text)); }
 .route-summary__stop {
   --mobile-inline-pair-gap: 7px;
   --mobile-inline-pair-leading: 1.4;
-  font-size: 13px;
+  font-size: max(13px, .8125rem);
 }
 .route-summary__stop-label {
   flex: none;
@@ -137,12 +129,4 @@ const originStation = computed(() => props.variant === 'compact' && props.waybil
   font-weight: 700;
 }
 .route-summary__stop-label--end { color: var(--tms-text-secondary); background: var(--tms-surface-muted); }
-.route-summary__meta, .route-summary__schedule {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px 10px;
-  color: var(--mobile-workspace-muted, var(--tms-text-secondary));
-  font-size: 12px;
-  line-height: 1.45;
-}
 </style>

@@ -242,10 +242,6 @@ async function removeAttachment(index: number) {
   }
 }
 
-function previewAttachment(index: number) {
-  const urls = attachments.value.map((item) => item.src);
-  uni.previewImage({ current: urls[index], urls });
-}
 
 async function uploadPendingAttachments() {
   if (!props.waybill || !auth.user?.id) {
@@ -587,7 +583,6 @@ function showError(error: unknown, fallback: string) {
           :uploading="state.choosing"
           :disabled="busy"
           @upload="addAttachments"
-          @preview="previewAttachment"
           @remove="removeAttachment"
         />
         <view v-if="attachments.length && ocrEnabled" class="expense-ocr">
@@ -696,6 +691,7 @@ function showError(error: unknown, fallback: string) {
 </template>
 
 <style scoped lang="scss">
+@use '@mobile-core/styles/form';
 .expense-sheet__sections {
   display: grid;
   min-width: 0;
@@ -721,14 +717,7 @@ function showError(error: unknown, fallback: string) {
   overflow-wrap: anywhere;
 }
 .expense-field--split, .expense-field__input-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  align-items: start;
-}
-.expense-field--split {
-  /* Leave space for the full date and chevron at 320px. */
-  grid-template-columns: minmax(0, 1fr) minmax(140px, 1fr);
+  @include form.field-grid;
 }
 .expense-field__invoice { grid-column: 1 / -1; }
 .expense-field__location-row { --mobile-inline-pair-gap: 5px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px; }

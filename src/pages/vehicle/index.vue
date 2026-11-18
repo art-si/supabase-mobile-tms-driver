@@ -7,6 +7,7 @@ import { onShow } from '@dcloudio/uni-app'
 import TmsBottomNav from '@/components/business/TmsBottomNav.vue'
 import MobileIcon from '@mobile-core/components/MobileIcon.vue'
 import MobileAction from '@mobile-core/components/MobileAction.vue'
+import MobileImagePreview from '@mobile-core/components/MobileImagePreview.vue'
 import TmsPageSkeleton from '@mobile-core/components/TmsPageSkeleton.vue'
 import MobileTopBar from '@mobile-core/components/MobileTopBar.vue'
 import TmsVehicleVisual from '@/components/business/TmsVehicleVisual.vue'
@@ -78,9 +79,7 @@ async function load() {
   }
 }
 
-function preview(url?: string) {
-  if (url) uni.previewImage({ urls: [url] })
-}
+const documentViewer = ref<InstanceType<typeof MobileImagePreview>>()
 </script>
 
 <template>
@@ -125,7 +124,7 @@ function preview(url?: string) {
                   class="mobile-row"
                   :aria-label="document.url ? `预览${document.label}` : `${document.label}待上传`"
                   :disabled="!document.url"
-                  @click="preview(document.url)"
+                  @click="document.url && documentViewer?.open([document.url], document.label)"
                 >
                   <view class="mobile-row__icon" aria-hidden="true">
                     <MobileIcon :name="document.icon" size="17px" />
@@ -135,6 +134,7 @@ function preview(url?: string) {
                   <MobileIcon v-if="document.url" class="mobile-row__chevron" name="chevron" size="14px" />
                 </MobileAction>
               </view>
+              <MobileImagePreview ref="documentViewer" />
             </view>
           </template>
 

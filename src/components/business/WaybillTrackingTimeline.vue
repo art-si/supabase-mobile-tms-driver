@@ -10,6 +10,7 @@ import { getExpenseAuditStatus } from "@/utils/expense-status";
 import MobileAction from '@mobile-core/components/MobileAction.vue'
 import MobileInlineLabel from '@mobile-core/components/MobileInlineLabel.vue'
 import MobileIcon from '@mobile-core/components/MobileIcon.vue'
+import MobileImagePreview from '@mobile-core/components/MobileImagePreview.vue'
 import MobileSegmented from '@mobile-core/components/MobileSegmented.vue'
 
 type TimelineTone = "blue" | "green" | "orange" | "red" | "gray";
@@ -317,13 +318,7 @@ function hasDetails(item: TimelineItem) {
   return Boolean(item.metrics.length || item.location || item.remark || shouldShowRecordedAt(item));
 }
 
-function preview(item: TimelineItem) {
-  if (!item.attachments.length) return;
-  uni.previewImage({
-    current: item.attachments[0],
-    urls: item.attachments,
-  });
-}
+const attachmentViewer = ref<InstanceType<typeof MobileImagePreview>>();
 </script>
 
 
@@ -357,7 +352,7 @@ function preview(item: TimelineItem) {
               :aria-label="`${expanded === item.id ? '收起' : '展开'}${item.title}明细`"
               :aria-expanded="expanded === item.id" @click="expanded = expanded === item.id ? undefined : item.id"
             >{{ expanded === item.id ? '收起明细' : '展开明细' }}</MobileAction>
-            <MobileAction v-if="item.attachments.length" variant="link" class="tracking-item__action" @click="preview(item)">
+            <MobileAction v-if="item.attachments.length" variant="link" class="tracking-item__action" @click="attachmentViewer?.open(item.attachments, '凭证')">
               <MobileInlineLabel icon="document" :label="`查看 ${item.attachments.length} 张凭证`" />
             </MobileAction>
           </view>
@@ -373,6 +368,7 @@ function preview(item: TimelineItem) {
       </view>
     </view>
     <text v-else class="driver-copy">完成运输节点后，操作时间和资料会显示在这里。</text>
+    <MobileImagePreview ref="attachmentViewer" />
   </view>
 </template>
 

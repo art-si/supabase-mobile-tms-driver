@@ -36,16 +36,21 @@ export async function sendDriverAssistantMessage(
   return { conversationId: response.conversationId, message: response.message }
 }
 
-export function getDriverAssistantError(error: unknown) {
+export function getDriverAssistantError(error: unknown, hasConversation: boolean): {
+  message: string
+  action?: 'retry' | 'reset'
+} {
   if (error instanceof ApiRequestError) {
     switch (error.code) {
-      case 'forbidden': return '当前账号暂不能使用 AI 助手，请联系管理员。'
-      case 'unauthorized': return '登录已过期，请重新登录后再试。'
-      case 'not_found': return '当前会话无法继续，请开始新对话。'
-      case 'rate_limited': return '提问次数已达上限，请稍后再试。'
+      case 'forbidden': return { message: '当前账号暂不能使用 AI 助手，请联系管理员。' }
+      case 'unauthorized': return { message: '登录已过期，请重新登录后再试。' }
+      case 'not_found': return hasConversation
+        ? { message: '当前对话已失效，可以带上问题开始新对话。', action: 'reset' }
+        : { message: 'AI 助手暂不可用，请联系管理员。' }
+      case 'rate_limited': return { message: '提问次数已达上限，请稍后再试。', action: 'retry' }
       case 'feature_disabled':
-      case 'missing_secret': return 'AI 助手暂不可用，请联系管理员。'
+      case 'missing_secret': return { message: 'AI 助手暂不可用，请联系管理员。' }
     }
   }
-  return getUserFacingErrorMessage(error, '暂时无法取得答复，请重试。')
+  return { message: getUserFacingErrorMessage(error, '暂时无法取得答复，请重试。'), action: 'retry' }
 }

@@ -124,10 +124,6 @@ function remove(kind: 'receipt' | 'signature', index: number) {
   target.splice(index, 1)
 }
 
-function preview(kind: 'receipt' | 'signature', index: number) {
-  const urls = kind === 'receipt' ? form.receiptUrls : form.signatureUrls
-  uni.previewImage({ current: urls[index], urls })
-}
 
 async function submit() {
   if (!visible.value || !props.waybill || !canSubmit.value) return
@@ -211,7 +207,7 @@ function showError(error: unknown, fallback: string) {
             :limit="kind === 'receipt' ? 5 : 3"
             :disabled="state.submitting || Boolean(state.uploading)"
             :uploading="state.uploading === kind"
-            @preview="preview(kind, $event)" @remove="remove(kind, $event)" @upload="upload(kind)"
+            @remove="remove(kind, $event)" @upload="upload(kind)"
           />
         </view>
 

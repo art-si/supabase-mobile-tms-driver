@@ -177,15 +177,6 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   })
 }
 
-export async function authPasswordLogin(email: string, password: string) {
-  const session = await request<Session>('/auth/v1/token?grant_type=password', {
-    method: 'POST',
-    body: { email, password },
-    headers: { Authorization: `Bearer ${SUPABASE_KEY}` }
-  })
-  return session
-}
-
 export async function driverPasswordLogin(account: string, password: string) {
   return request<Session>('/functions/v1/driver-auth', {
     method: 'POST',
@@ -195,9 +186,9 @@ export async function driverPasswordLogin(account: string, password: string) {
 }
 
 export async function driverWechatPhoneLogin(phoneCode: string) {
-  return request<Session>('/functions/v1/driver-auth', {
+  return request<Session>('/functions/v1/mobile-wechat-auth', {
     method: 'POST',
-    body: { type: 'wechat-phone', phoneCode },
+    body: { app: 'driver', phoneCode },
     headers: { Authorization: `Bearer ${SUPABASE_KEY}` }
   })
 }
@@ -217,15 +208,11 @@ export async function signOut(token: string) {
   })
 }
 
-export async function syncDriverWaybills(token: string) {
-  return request<{ ok: boolean; synced: number; waybillNos: string[] }>(
-    '/functions/v1/sync-driver-waybills',
-    {
-      method: 'POST',
-      token,
-      body: {}
-    }
-  )
+export async function bindDriverWechatPhone(phoneCode: string, token: string) {
+  const result = await request<{ bound?: boolean }>('/functions/v1/mobile-wechat-auth', {
+    method: 'POST', token, body: { app: 'driver', action: 'bind', phoneCode }
+  })
+  if (result.bound !== true) throw new ApiRequestError({ code: 'WECHAT_PHONE_UNAVAILABLE' }, '绑定未完成，请重新授权')
 }
 
 export function restPath(table: string, query = '') {

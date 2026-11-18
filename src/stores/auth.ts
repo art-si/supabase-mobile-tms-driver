@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { redirectToLogin } from '@mobile-core/login-navigation'
-import { ApiRequestError, driverPasswordLogin, driverWechatPhoneLogin, refreshToken, signOut } from '@/api/supabase'
+import { ApiRequestError, bindDriverWechatPhone, driverPasswordLogin, driverWechatPhoneLogin, refreshToken, signOut } from '@/api/supabase'
+import { getProfileSummary } from '@/api/profile'
+import { useProfileStore } from './profile'
 import type { Session } from '@/api/types'
 import { useDictionaryStore } from './dictionary'
 
@@ -61,6 +63,7 @@ export const useAuthStore = defineStore('auth', {
     clearSession(redirect = false) {
       sessionRevision += 1
       useDictionaryStore().clear()
+      useProfileStore().clear()
       this.session = null
       this.persist()
       if (redirect) redirectToLogin()
@@ -101,21 +104,33 @@ export const useAuthStore = defineStore('auth', {
     },
     async login(account: string, password: string) {
       const session = await driverPasswordLogin(account.trim(), password)
-      sessionRevision += 1
-      useDictionaryStore().clear()
-      this.session = normalizeSession(session)
-      this.persist()
-      await useDictionaryStore().load(this.token, true)
-      return this.session
+      return this.completeSignIn(session)
     },
     async loginWithWechatPhone(phoneCode: string) {
       const session = await driverWechatPhoneLogin(phoneCode)
-      sessionRevision += 1
-      useDictionaryStore().clear()
-      this.session = normalizeSession(session)
-      this.persist()
-      await useDictionaryStore().load(this.token, true)
-      return this.session
+      return this.completeSignIn(session)
+    },
+    async completeSignIn(session: Session): Promise<Session> {
+      this.clearSession()
+      const revision = sessionRevision
+      try {
+        if (!session?.access_token || !session.refresh_token || !session.user?.id) throw new Error('登录服务未返回有效会话，请重试')
+        const summary = await getProfileSummary(session.access_token)
+        await useDictionaryStore().load(session.access_token, true)
+        if (revision !== sessionRevision) throw new Error('登录状态已变更，请重新登录')
+        useProfileStore().$patch({ summary })
+        this.session = normalizeSession(session)
+        this.persist()
+        return session
+      } catch (error) {
+        try { await signOut(session.access_token) } catch { /* Local credentials are still cleared. */ }
+        if (revision === sessionRevision) this.clearSession()
+        throw error
+      }
+    },
+    async bindWechatPhone(phoneCode: string): Promise<void> {
+      if (!(await this.ensureValidSession(false))) throw new Error('请先用账号密码重新登录，再绑定微信手机号')
+      await bindDriverWechatPhone(phoneCode, this.token)
     },
     async refreshSession(redirect = true) {
       const revision = sessionRevision

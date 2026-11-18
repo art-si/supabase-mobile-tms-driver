@@ -11,7 +11,7 @@ const props = defineProps<{
 
 const dictionary = useDictionaryStore()
 const label = computed(
-  () => STATUS_LABEL[props.status] || dictionary.findLabel('tmsWaybillStatus', props.status) || props.status
+  () => STATUS_LABEL[props.status] || dictionary.findLabel('tmsWaybillStatus', props.status) || '状态未知'
 )
 </script>
 

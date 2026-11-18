@@ -113,12 +113,6 @@ function openEdit(record: DriverExpenseRecord) {
   sheetVisible.value = true;
 }
 
-function previewAttachments(record: DriverExpenseRecord, index: number) {
-  uni.previewImage({
-    current: record.attachments[index],
-    urls: record.attachments,
-  });
-}
 
 async function handleSuccess(costId: string) {
   submitted.value = { costId, previous: editingRecord.value };
@@ -212,7 +206,6 @@ async function handleSuccess(costId: string) {
                   :images="record.attachments"
                   label="费用凭证"
                   readonly
-                  @preview="previewAttachments(record, $event)"
                 />
               </view>
               <text v-if="record.submittedAt || record.createTime" class="driver-copy">提交于 {{ formatDateTime(record.submittedAt || record.createTime) }}</text>

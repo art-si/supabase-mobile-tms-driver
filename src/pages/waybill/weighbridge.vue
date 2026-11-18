@@ -87,9 +87,6 @@ function measurements(record: CargoOperationRecord) {
   ]
 }
 
-function preview(record: CargoOperationRecord, index: number) {
-  uni.previewImage({ current: record.weighbridgeTicketUrls[index], urls: record.weighbridgeTicketUrls })
-}
 </script>
 
 <template>
@@ -126,7 +123,7 @@ function preview(record: CargoOperationRecord, index: number) {
             <template v-if="stop.record">
               <MobileMetricGrid :items="measurements(stop.record)" />
               <text v-if="stop.record.completedAt" class="driver-copy">资料提交于 {{ formatDateTime(stop.record.completedAt) }}</text>
-              <MobileEvidence v-if="stop.record.weighbridgeTicketUrls.length" :images="stop.record.weighbridgeTicketUrls" :label="`${stop.name}磅单`" readonly @preview="preview(stop.record, $event)" />
+              <MobileEvidence v-if="stop.record.weighbridgeTicketUrls.length" :images="stop.record.weighbridgeTicketUrls" :label="`${stop.name}磅单`" readonly />
               <text v-else class="driver-copy">暂无{{ stop.name }}磅单，作业资料提交后会显示在这里。</text>
             </template>
             <text v-else-if="stop.pending && !stop.failure" class="driver-copy" role="status">正在同步{{ stop.name }}过磅资料…</text>

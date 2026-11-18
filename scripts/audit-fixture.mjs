@@ -115,7 +115,6 @@ export async function useAuditFixture(context, base) {
         data = { access_token: 'fixture-token', refresh_token: 'fixture-refresh', expires_in: 3600, user: { id: 'audit-user' } }
         break
       case 'logout': return route.fulfill({ status: 204, headers })
-      case 'sync-driver-waybills': data = { ok: true, synced: 0, waybillNos: [] }; break
       case 'sys_dict_type': data = [{ id: 'payment-audit', code: 'tmsCashPaymentMethod', name: '支付方式' }]; break
       case 'sys_dictionary': data = [{ id: 'payment-cash', typeId: 'payment-audit', value: 'cash', label: '现金' }]; break
       case 'tms_get_driver_mobile_profile':
